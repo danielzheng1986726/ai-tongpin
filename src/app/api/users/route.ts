@@ -16,6 +16,7 @@ export async function GET() {
       email: true,
       avatarUrl: true,
       shadesJson: true,
+      personalityType: true,
     },
     orderBy: { createdAt: "desc" },
   });

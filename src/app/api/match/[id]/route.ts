@@ -15,8 +15,8 @@ export async function GET(
   const match = await prisma.match.findUnique({
     where: { id },
     include: {
-      userA: { select: { id: true, name: true, avatarUrl: true, shadesJson: true } },
-      userB: { select: { id: true, name: true, avatarUrl: true, shadesJson: true } },
+      userA: { select: { id: true, name: true, avatarUrl: true, shadesJson: true, personalityType: true } },
+      userB: { select: { id: true, name: true, avatarUrl: true, shadesJson: true, personalityType: true } },
     },
   });
 

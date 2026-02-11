@@ -14,6 +14,10 @@ export async function GET() {
       name: user.name,
       email: user.email,
       avatarUrl: user.avatarUrl,
+      personalityType: user.personalityType || null,
+      personalityScores: user.personalityScores
+        ? JSON.parse(user.personalityScores)
+        : null,
     },
   });
 }

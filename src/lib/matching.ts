@@ -43,7 +43,7 @@ const ACTION_CONTROL = `仅输出合法 JSON 对象，不要输出任何解释�
 }
 根据用户A的兴趣特征和用户B的对话回答，从职业方向、行业认知、工作风格、价值观四个维度评估两人的职场匹配程度。totalScore是四个维度的综合评分。`;
 
-function formatShades(shadesJson: string | null): string {
+export function formatShades(shadesJson: string | null): string {
   if (!shadesJson) return "暂无标签信息";
   try {
     const shades = JSON.parse(shadesJson);
@@ -51,9 +51,17 @@ function formatShades(shadesJson: string | null): string {
     return shades
       .map((s: unknown) => {
         if (typeof s === "string") return s;
-        if (s && typeof s === "object" && "name" in s) return (s as { name: string }).name;
-        return String(s);
+        if (s && typeof s === "object") {
+          const obj = s as Record<string, unknown>;
+          for (const key of ["name", "label", "title", "text"]) {
+            if (typeof obj[key] === "string") return obj[key] as string;
+          }
+          const first = Object.values(obj).find((v) => typeof v === "string");
+          if (first) return first as string;
+        }
+        return null;
       })
+      .filter(Boolean)
       .join("、");
   } catch {
     return "暂无标签信息";

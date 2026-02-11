@@ -15,6 +15,8 @@ model User {
   name           String?
   avatarUrl      String?  @map("avatar_url")
   shadesJson     String?  @map("shades_json")
+  personalityType   String?  @map("personality_type")
+  personalityScores String?  @map("personality_scores")
   accessToken    String   @map("access_token")
   refreshToken   String   @map("refresh_token")
   tokenExpiresAt DateTime @map("token_expires_at")

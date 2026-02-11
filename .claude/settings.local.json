@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma generate:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npx next build:*)",
+      "Bash(gh repo create:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth status:*)",
+      "Bash(git -C /Users/xiaodongzheng/ai-tongpin remote add origin:*)",
+      "Bash(git -C /Users/xiaodongzheng/ai-tongpin add -A)",
+      "Bash(git -C /Users/xiaodongzheng/ai-tongpin status --short)"
+    ]
+  }
+}
