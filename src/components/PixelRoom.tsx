@@ -245,16 +245,62 @@ interface Character {
   emojiTimer: number;
   chatPartner: string | null;
   speed: number;
+  isGhost?: boolean;
 }
 
 // — Main Component —
 export default function PixelRoom() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const charsRef = useRef<Character[]>([]);
+  const ghostCharsRef = useRef<Character[]>([]);
   const frameRef = useRef<number>(0);
   const animRef = useRef<number | null>(null);
   const [dimensions, setDimensions] = useState({ w: 375, h: 280 });
   const [userCount, setUserCount] = useState(0);
+
+  // Generate ghost characters to fill empty slots (up to 8 total)
+  const updateGhosts = useCallback((realCount: number, W: number, H: number) => {
+    const ghostCount = Math.max(0, 8 - realCount);
+    const existing = ghostCharsRef.current;
+
+    if (existing.length === ghostCount) return; // no change needed
+
+    if (ghostCount === 0) {
+      ghostCharsRef.current = [];
+      return;
+    }
+
+    // Reuse existing ghosts where possible, add/remove as needed
+    const ghosts: Character[] = [];
+    for (let i = 0; i < ghostCount; i++) {
+      if (i < existing.length) {
+        ghosts.push(existing[i]);
+      } else {
+        // Spread initial positions evenly using deterministic seeding
+        const seed = i / ghostCount;
+        ghosts.push({
+          id: `ghost-${i}`,
+          name: "",
+          personalityType: "",
+          color1: "#9CA3AF",
+          color2: "#9CA3AF",
+          x: 30 + seed * (W - 60) + (Math.sin(i * 7.3) * 30),
+          y: 55 + (Math.cos(i * 4.1) * 0.5 + 0.5) * (H - 120),
+          targetX: 0,
+          targetY: 0,
+          state: STATES.IDLE,
+          stateTimer: 30 + i * 20,
+          frame: i * 5,
+          emoji: null,
+          emojiTimer: 0,
+          chatPartner: null,
+          speed: (0.4 + Math.random() * 0.3) * 0.6, // 0.6x speed multiplier
+          isGhost: true,
+        });
+      }
+    }
+    ghostCharsRef.current = ghosts;
+  }, []);
 
   // Fetch users & poll every 30 seconds
   const fetchUsers = useCallback(async () => {
@@ -305,17 +351,20 @@ export default function PixelRoom() {
 
       charsRef.current = updated;
       setUserCount(updated.length);
+      updateGhosts(updated.length, W, H);
     } catch (e) {
       console.error("PixelRoom: failed to fetch users", e);
     }
-  }, [dimensions]);
+  }, [dimensions, updateGhosts]);
 
   // Initial fetch + 30s polling
   useEffect(() => {
+    // Generate initial ghosts immediately so the room isn't empty before first fetch
+    updateGhosts(0, dimensions.w, dimensions.h);
     fetchUsers();
     const interval = setInterval(fetchUsers, 30000);
     return () => clearInterval(interval);
-  }, [fetchUsers]);
+  }, [fetchUsers, updateGhosts, dimensions]);
 
   // Pick a new random walk target
   const pickTarget = useCallback((char: Character, W: number, H: number) => {
@@ -427,9 +476,58 @@ export default function PixelRoom() {
         c.y = Math.max(44, Math.min(H - 46, c.y));
       });
 
+      // — Update ghosts —
+      const ghosts = ghostCharsRef.current;
+      ghosts.forEach(g => {
+        g.stateTimer--;
+        g.frame++;
+
+        // Simplified state machine: only IDLE and WALKING (no chatting)
+        if (g.stateTimer <= 0) {
+          if (g.state === STATES.IDLE) {
+            g.state = STATES.WALKING;
+            g.targetX = 20 + Math.random() * (W - 40);
+            g.targetY = 50 + Math.random() * (H - 100);
+            g.stateTimer = 100 + Math.random() * 150;
+          } else {
+            g.state = STATES.IDLE;
+            g.stateTimer = 80 + Math.random() * 120;
+          }
+        }
+
+        if (g.state === STATES.WALKING) {
+          const dx = g.targetX - g.x;
+          const dy = g.targetY - g.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 2) {
+            g.x += (dx / dist) * g.speed;
+            g.y += (dy / dist) * g.speed;
+          } else {
+            g.stateTimer = 0;
+          }
+        }
+
+        if (g.state === STATES.IDLE) {
+          g.x += Math.sin(f * 0.015 + g.x) * 0.03;
+        }
+
+        g.x = Math.max(10, Math.min(W - 26, g.x));
+        g.y = Math.max(44, Math.min(H - 46, g.y));
+      });
+
       // — Render —
       ctx.clearRect(0, 0, W, H);
       drawRoom(ctx, W, H);
+
+      // Draw ghosts first (behind real users)
+      const sortedGhosts = [...ghosts].sort((a, b) => a.y - b.y);
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      sortedGhosts.forEach(g => {
+        const walkFrame = g.state === STATES.WALKING ? g.frame : 0;
+        drawPixelChar(ctx, g.x, g.y, g.color1, g.color2, walkFrame, 2);
+      });
+      ctx.restore();
 
       const sorted = [...chars].sort((a, b) => a.y - b.y);
 

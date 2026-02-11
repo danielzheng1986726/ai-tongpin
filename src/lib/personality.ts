@@ -7,69 +7,42 @@ export interface PersonalityScores {
   values: number;
 }
 
-interface ClassificationRule {
-  key: PersonalityKey;
-  conditions: ((s: PersonalityScores) => boolean)[];
-}
-
-const RULES: ClassificationRule[] = [
-  {
-    key: "spark",
-    conditions: [(s) => s.career >= 65, (s) => s.workStyle >= 65],
-  },
-  {
-    key: "deepsea",
-    conditions: [(s) => s.industry >= 65, (s) => s.workStyle < 50],
-  },
-  {
-    key: "aurora",
-    conditions: [
-      (s) => s.career >= 55,
-      (s) => s.industry >= 55,
-      (s) => s.values >= 55,
-    ],
-  },
-  {
-    key: "warmsun",
-    conditions: [(s) => s.values >= 65, (s) => s.industry >= 50],
-  },
-  {
-    key: "bedrock",
-    conditions: [(s) => s.values >= 60, (s) => s.workStyle < 55],
-  },
-  {
-    key: "lightning",
-    conditions: [(s) => s.workStyle >= 70, (s) => s.career >= 50],
-  },
-  {
-    key: "brightmoon",
-    conditions: [
-      (s) => s.industry >= 65,
-      (s) => s.career >= 55,
-      (s) => s.workStyle < 60,
-    ],
-  },
-  {
-    key: "springbreeze",
-    conditions: [
-      (s) => s.values >= 60,
-      (s) => s.workStyle >= 45,
-      (s) => s.workStyle <= 60,
-    ],
-  },
-];
-
 export function classifyPersonality(scores: PersonalityScores): PersonalityKey {
-  let bestKey: PersonalityKey = "aurora";
-  let bestCount = 0;
+  const entries = [
+    { dim: "career" as const, val: scores.career },
+    { dim: "industry" as const, val: scores.industry },
+    { dim: "workStyle" as const, val: scores.workStyle },
+    { dim: "values" as const, val: scores.values },
+  ].sort((a, b) => b.val - a.val);
 
-  for (const rule of RULES) {
-    const matched = rule.conditions.filter((cond) => cond(scores)).length;
-    if (matched === rule.conditions.length && matched > bestCount) {
-      bestCount = matched;
-      bestKey = rule.key;
-    }
+  const highest = entries[0];
+  const second = entries[1];
+  const lowest = entries[3];
+  const spread = highest.val - lowest.val;
+
+  // 四维分差很小 = 真正均衡的人 → 极光
+  if (spread <= 10) return "aurora";
+
+  // 按最强维度 + 次强维度组合分类
+  if (highest.dim === "career") {
+    return second.dim === "industry" ? "brightmoon" : "spark";
   }
 
-  return bestKey;
+  if (highest.dim === "industry") {
+    return scores.workStyle <= scores.industry - 10 ? "deepsea" : "brightmoon";
+  }
+
+  if (highest.dim === "workStyle") {
+    return second.dim === "career" ? "spark" : "lightning";
+  }
+
+  if (highest.dim === "values") {
+    if (lowest.dim === "workStyle") {
+      return second.dim === "industry" ? "springbreeze" : "bedrock";
+    }
+    if (lowest.dim === "career") return "warmsun";
+    return "springbreeze";
+  }
+
+  return "aurora";
 }
