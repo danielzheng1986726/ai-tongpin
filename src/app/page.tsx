@@ -13,6 +13,7 @@ import html2canvas from "html2canvas";
 import LiveAIChat from "@/components/LiveAIChat";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
 import ChatInput from "@/components/ChatInput";
+import PersonalityReveal from "@/components/PersonalityReveal";
 
 const PixelRoom = dynamic(() => import("@/components/PixelRoom"), { ssr: false });
 
@@ -32,17 +33,27 @@ interface OtherUser {
   avatarUrl: string | null;
   shadesJson: string | null;
   personalityType: string | null;
+  matchScore: number | null;
 }
 
 export default function Home() {
   const [me, setMe] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReveal, setShowReveal] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : { user: null }))
       .then((data) => {
         setMe(data.user);
+        // 已登录 + 有人格 + 未看过 → 展示人格揭示页
+        if (
+          data.user?.personalityType &&
+          PERSONALITIES[data.user.personalityType as PersonalityKey] &&
+          !localStorage.getItem("tongpin-personality-seen")
+        ) {
+          setShowReveal(true);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -53,6 +64,15 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-[#0F0B1F]">
         <div className="text-white/40 animate-pulse">加载中...</div>
       </div>
+    );
+  }
+
+  if (showReveal && me?.personalityType) {
+    return (
+      <PersonalityReveal
+        personalityType={me.personalityType as PersonalityKey}
+        onEnter={() => setShowReveal(false)}
+      />
     );
   }
 
@@ -548,6 +568,7 @@ function DiscoverView({
                 user={user}
                 isMatching={matchingId === user.id}
                 onMatch={() => startMatch(user.id)}
+                currentUserPersonalityType={currentUser.personalityType}
               />
             ))}
           </div>
@@ -561,18 +582,38 @@ function UserCard({
   user,
   isMatching,
   onMatch,
+  currentUserPersonalityType,
 }: {
   user: OtherUser;
   isMatching: boolean;
   onMatch: () => void;
+  currentUserPersonalityType: string | null;
 }) {
   const shades = parseShades(user.shadesJson);
   const personality = user.personalityType
     ? PERSONALITIES[user.personalityType as PersonalityKey]
     : null;
 
+  // Badge gradient: current user's color -> target user's color
+  const myColor = currentUserPersonalityType
+    ? personalityColors[currentUserPersonalityType]
+    : null;
+  const theirColor = user.personalityType
+    ? personalityColors[user.personalityType]
+    : null;
+  const badgeFrom = myColor?.from || "#7B2FF7";
+  const badgeTo = theirColor?.to || "#22D1EE";
+
   return (
-    <div className="bg-white/5 rounded-xl border border-white/10 p-4 hover:bg-white/8 transition-colors">
+    <div className="relative bg-white/5 rounded-xl border border-white/10 p-4 hover:bg-white/8 transition-colors">
+      {user.matchScore != null && (
+        <span
+          className="absolute -top-2 -right-2 text-xs font-medium px-2 py-0.5 rounded-full text-white/90"
+          style={{ background: `linear-gradient(135deg, ${badgeFrom}, ${badgeTo})` }}
+        >
+          {user.matchScore}分
+        </span>
+      )}
       <div className="flex items-start gap-3">
         {user.avatarUrl ? (
           <img

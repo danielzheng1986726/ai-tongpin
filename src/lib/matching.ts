@@ -113,7 +113,14 @@ export async function runMatching(
     let sessionId: string | undefined;
 
     for (let i = 0; i < CHAT_QUESTIONS.length; i++) {
-      const question = CHAT_QUESTIONS[i];
+      let question = CHAT_QUESTIONS[i];
+
+      // 第2、3、4轮：先回应对方上一轮的回答，再自然过渡到新话题
+      if (i > 0) {
+        const prevAnswer = chatLog[i - 1].answer;
+        question = `对方刚才说："${prevAnswer}"\n\n请你先用1-2句话自然地回应对方上面提到的内容或观点，然后再自然过渡到下一个话题：${CHAT_QUESTIONS[i]}`;
+      }
+
       const result = await chatWithSecondMe(userBId, question, {
         sessionId,
         systemPrompt: i === 0 ? SYSTEM_PROMPT : undefined,
@@ -121,7 +128,7 @@ export async function runMatching(
 
       if (result.sessionId) sessionId = result.sessionId;
 
-      chatLog.push({ question, answer: result.content });
+      chatLog.push({ question: CHAT_QUESTIONS[i], answer: result.content });
     }
 
     // 3. 构造 Act API 的评估输入

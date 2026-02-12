@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "同频 - 职场社交匹配",
+  title: "同频 - 不只是你的AI职场伙伴",
   description: "基于 AI 的职场社交匹配平台",
 };
 
