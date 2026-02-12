@@ -23,8 +23,9 @@ model User {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  matchesAsA Match[] @relation("matchesAsA")
-  matchesAsB Match[] @relation("matchesAsB")
+  matchesAsA  Match[]     @relation("matchesAsA")
+  matchesAsB  Match[]     @relation("matchesAsB")
+  topicPosts  TopicPost[]
 
   @@map("users")
 }
@@ -43,6 +44,29 @@ model Match {
   userB User @relation("matchesAsB", fields: [userBId], references: [id])
 
   @@map("matches")
+}
+
+model Topic {
+  id        String      @id @default(cuid())
+  title     String
+  createdAt DateTime    @default(now()) @map("created_at")
+  posts     TopicPost[]
+
+  @@map("topics")
+}
+
+model TopicPost {
+  id              String   @id @default(cuid())
+  topicId         String   @map("topic_id")
+  topic           Topic    @relation(fields: [topicId], references: [id])
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id])
+  floor           Int
+  content         String
+  personalityType String   @map("personality_type")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("topic_posts")
 }
 
 model Danmaku {

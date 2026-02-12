@@ -10,7 +10,7 @@ import {
 import { personalityColors } from "@/data/ambient-conversations";
 import type { PersonalityScores } from "@/lib/personality";
 import html2canvas from "html2canvas";
-import LiveAIChat from "@/components/LiveAIChat";
+import TopicForum from "@/components/TopicForum";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
 import ChatInput from "@/components/ChatInput";
 import PersonalityReveal from "@/components/PersonalityReveal";
@@ -34,6 +34,15 @@ interface OtherUser {
   shadesJson: string | null;
   personalityType: string | null;
   matchScore: number | null;
+  matchId: string | null;
+}
+
+interface SelectedChar {
+  id: string;
+  name: string;
+  personalityType: string;
+  screenX: number;
+  screenY: number;
 }
 
 export default function Home() {
@@ -368,6 +377,8 @@ function DiscoverView({
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [showFullCard, setShowFullCard] = useState(false);
+  const [showUserList, setShowUserList] = useState(false);
+  const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null);
   const [danmakuMessages, setDanmakuMessages] = useState<{ text: string; username: string; color?: string }[]>([]);
   const danmakuPool = useRef<{ text: string; username: string; color?: string }[]>([]);
   const danmakuIndex = useRef(0);
@@ -486,27 +497,50 @@ function DiscoverView({
     [router]
   );
 
-  // 给 LiveAIChat 用的用户列表（包含当前用户）
-  const allUsersForChat = [
-    { id: currentUser.id, username: currentUser.name || "用户", personalityType: currentUser.personalityType },
-    ...users.map(u => ({
-      id: u.id,
-      username: u.name || "用户",
-      personalityType: u.personalityType,
-    })),
-  ];
-
   // 人格信息
   const pKey = currentUser.personalityType as PersonalityKey | null;
   const personality = pKey ? PERSONALITIES[pKey] : null;
+
+  const matchedUserIds = users.filter(u => u.matchScore != null).map(u => u.id);
+
+  const handleCharClick = useCallback((char: SelectedChar) => {
+    setSelectedChar(char);
+  }, []);
+
+  const handlePopupMatch = useCallback((targetId: string) => {
+    setSelectedChar(null);
+    startMatch(targetId);
+  }, [startMatch]);
+
+  const handlePopupViewReport = useCallback((matchId: string) => {
+    setSelectedChar(null);
+    router.push(`/match/${matchId}`);
+  }, [router]);
 
   return (
     <main className="flex flex-col">
       {/* 像素小屋 + 弹幕 */}
       <div className="relative w-full max-w-lg mx-auto" style={{ minHeight: "420px" }}>
-        <PixelRoom />
+        <PixelRoom
+          onCharacterClick={handleCharClick}
+          matchedUserIds={matchedUserIds}
+          currentUser={{ id: currentUser.id, name: currentUser.name || "用户", personalityType: currentUser.personalityType }}
+        />
         <DanmakuOverlay messages={danmakuMessages} />
       </div>
+
+      {/* 角色浮层卡片 */}
+      {selectedChar && (
+        <CharacterPopup
+          char={selectedChar}
+          users={users}
+          currentUser={currentUser}
+          matchingId={matchingId}
+          onMatch={handlePopupMatch}
+          onViewReport={handlePopupViewReport}
+          onClose={() => setSelectedChar(null)}
+        />
+      )}
 
       {/* 弹幕输入框 */}
       <div className="w-full max-w-lg mx-auto">
@@ -517,8 +551,8 @@ function DiscoverView({
         />
       </div>
 
-      {/* AI 实时聊天 */}
-      <LiveAIChat users={allUsersForChat} />
+      {/* 话题盖楼 */}
+      <TopicForum />
 
       {/* 人格卡片 - 折叠版 */}
       <div className="w-full max-w-lg mx-auto px-4 mt-2">
@@ -540,41 +574,187 @@ function DiscoverView({
         )}
       </div>
 
-      {/* 用户列表 */}
-      <div className="w-full max-w-lg mx-auto px-4 mt-6">
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-white/90">发现</h2>
-          <p className="text-xs text-white/40 mt-1">
-            点击用户卡片，AI 将深度对话分析你们的匹配度
-          </p>
-        </div>
+      {/* 用户列表 - 默认折叠 */}
+      <div className="w-full max-w-lg mx-auto px-4 mt-6 mb-8">
+        <button
+          onClick={() => setShowUserList(!showUserList)}
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-white/5 rounded-xl border border-white/10 hover:bg-white/8 transition-colors"
+        >
+          <span className="text-sm text-white/70">
+            {users.length > 0 ? `查看全部 ${users.length} 位用户` : "查看用户列表"}
+          </span>
+          <span className="text-xs text-white/30">
+            {showUserList ? "▲ 收起" : "▼ 展开"}
+          </span>
+        </button>
 
-        {loadingUsers ? (
-          <div className="text-center py-12 text-white/30 animate-pulse">
-            加载用户列表...
-          </div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-white/40 mb-2">暂时没有其他用户</p>
-            <p className="text-sm text-white/25">
-              邀请朋友使用 SecondMe 登录，即可开始匹配
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {users.map((user) => (
-              <UserCard
-                key={user.id}
-                user={user}
-                isMatching={matchingId === user.id}
-                onMatch={() => startMatch(user.id)}
-                currentUserPersonalityType={currentUser.personalityType}
-              />
-            ))}
+        {showUserList && (
+          <div className="mt-3">
+            {loadingUsers ? (
+              <div className="text-center py-12 text-white/30 animate-pulse">
+                加载用户列表...
+              </div>
+            ) : users.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-white/40 mb-2">暂时没有其他用户</p>
+                <p className="text-sm text-white/25">
+                  邀请朋友使用 SecondMe 登录，即可开始匹配
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {users.map((user) => (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    isMatching={matchingId === user.id}
+                    onMatch={() => startMatch(user.id)}
+                    currentUserPersonalityType={currentUser.personalityType}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
     </main>
+  );
+}
+
+/* ========== 角色浮层卡片 ========== */
+
+function CharacterPopup({
+  char,
+  users,
+  currentUser,
+  matchingId,
+  onMatch,
+  onViewReport,
+  onClose,
+}: {
+  char: SelectedChar;
+  users: OtherUser[];
+  currentUser: UserInfo;
+  matchingId: string | null;
+  onMatch: (targetId: string) => void;
+  onViewReport: (matchId: string) => void;
+  onClose: () => void;
+}) {
+  const isMe = char.id === currentUser.id;
+  const userInfo = users.find(u => u.id === char.id);
+  const personality = char.personalityType && PERSONALITIES[char.personalityType as PersonalityKey]
+    ? PERSONALITIES[char.personalityType as PersonalityKey]
+    : null;
+
+  const myColor = currentUser.personalityType
+    ? personalityColors[currentUser.personalityType]
+    : null;
+  const theirColor = char.personalityType
+    ? personalityColors[char.personalityType]
+    : null;
+
+  const gradFrom = myColor?.from || "#7B2FF7";
+  const gradTo = theirColor?.to || "#22D1EE";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      {/* Card */}
+      <div
+        className="relative w-full max-w-sm mx-4 mb-6 sm:mb-0 rounded-2xl overflow-hidden animate-[slideUp_0.25s_ease-out]"
+        style={{ background: "linear-gradient(180deg, #1A1230 0%, #0F0B1F 100%)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white/50 hover:text-white/80 hover:bg-white/20 transition-colors text-sm z-10"
+        >
+          x
+        </button>
+
+        <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center">
+          {/* Personality badge circle */}
+          {personality ? (
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mb-4 border-2 border-white/20"
+              style={{ background: personality.colors.gradient, color: personality.colors.text }}
+            >
+              {personality.name[0]}
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-xl text-white/40 mb-4 border-2 border-white/10">
+              ?
+            </div>
+          )}
+
+          {/* Name */}
+          <h3 className="text-lg font-bold text-white/90 mb-1">{char.name}</h3>
+
+          {/* Personality tag */}
+          {personality && (
+            <span
+              className="text-xs px-3 py-1 rounded-full font-medium mb-3"
+              style={{ background: personality.colors.gradient, color: personality.colors.text }}
+            >
+              {personality.name} · {personality.nameEn}
+            </span>
+          )}
+
+          {/* Quote */}
+          <p className="text-sm text-white/50 italic mb-5 leading-relaxed">
+            {personality ? personality.quote : "刚搬进同频小屋，还在收拾行李..."}
+          </p>
+
+          {/* Match score (if matched) */}
+          {userInfo?.matchScore != null && (
+            <div className="mb-4 flex items-center gap-2">
+              <span
+                className="text-sm font-bold px-3 py-1 rounded-full text-white"
+                style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}
+              >
+                同频指数 {userInfo.matchScore}
+              </span>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          {isMe ? (
+            <p className="text-xs text-white/30">这是你自己的 AI 分身</p>
+          ) : userInfo?.matchScore != null && userInfo?.matchId ? (
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => onViewReport(userInfo.matchId!)}
+                className="flex-1 text-sm font-medium py-2.5 rounded-xl text-white transition-opacity hover:opacity-90"
+                style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}
+              >
+                查看匹配报告
+              </button>
+              <button
+                onClick={() => onMatch(char.id)}
+                disabled={matchingId === char.id}
+                className="px-4 text-sm font-medium py-2.5 rounded-xl border border-white/20 text-white/70 hover:bg-white/10 transition-colors disabled:opacity-50"
+              >
+                {matchingId === char.id ? "..." : "重新匹配"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onMatch(char.id)}
+              disabled={matchingId === char.id}
+              className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-opacity hover:opacity-90 disabled:opacity-50 bg-gradient-to-r from-purple-600 to-teal-500"
+            >
+              {matchingId === char.id ? "匹配中..." : "发起 AI 同频"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

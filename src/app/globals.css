@@ -41,6 +41,16 @@ body {
   100% { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes slideUp {
+  0% { transform: translateY(40px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 .animate-gradient-flow {
   background-size: 200% 200%;
   animation: gradient-flow 6s ease infinite;

@@ -15,6 +15,22 @@ const PERSONALITY_COLORS: Record<string, { primary: string; secondary: string; l
 const EMOJIS = ["💡","🔥","✨","💬","❤️","🎯","🤝","⭐","🌈","💪","😄","🎵","☕","🌟","👋"];
 const CHAT_EMOJIS = ["💬","🗣️","💡","🤔","😊","👀"];
 
+// — 小人闲聊台词 —
+const CHAT_LINES = [
+  "创造力比效率重要", "你也喜欢深夜散步吗", "这个观点很有意思",
+  "AI会改变一切", "我最近在读一本好书", "你的想法很独特",
+  "深度对话才有意义", "我觉得匹配靠缘分", "认知风格决定一切",
+  "换个角度想想看", "你平时怎么充电", "好久没这么聊过了",
+  "我也是这么想的", "这杯咖啡不错", "有时候慢就是快",
+  "直觉很重要", "想听听你的看法", "周末有什么计划",
+  "我最近在学新东西", "一起头脑风暴吧", "其实我也不确定",
+  "有道理 继续说", "这让我想到一件事", "我觉得你说得对",
+  "灵感来了", "需要换个思路", "我喜欢这个方向",
+  "你试过冥想吗", "保持好奇心很重要", "简单就是美",
+  "先做再说吧", "这很有启发", "我们想法很像",
+  "说不定可以合作", "有些事急不来", "越聊越有感觉",
+];
+
 // — Pixel character sprite drawer —
 function drawPixelChar(ctx: CanvasRenderingContext2D, x: number, y: number, color1: string, color2: string, frame: number, scale = 2) {
   const s = scale;
@@ -246,10 +262,103 @@ interface Character {
   chatPartner: string | null;
   speed: number;
   isGhost?: boolean;
+  chatText?: string | null;
+  chatTimer?: number;
+}
+
+// — Draw matched user glow —
+function drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, frame: number) {
+  ctx.save();
+  const pulse = 0.35 + Math.sin(frame * 0.04) * 0.15;
+  const cx = x + 8;
+  const cy = y + 8;
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 22);
+  grad.addColorStop(0, `rgba(${r},${g},${b},${pulse})`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// — Draw "me" indicator arrow —
+function drawMeIndicator(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.save();
+  const cx = x + 8;
+  const top = y - 28;
+  // Small downward triangle
+  ctx.fillStyle = "#FFF";
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, top);
+  ctx.lineTo(cx + 4, top);
+  ctx.lineTo(cx, top + 5);
+  ctx.closePath();
+  ctx.fill();
+  // "我" label
+  ctx.font = "bold 8px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("我", cx, top - 3);
+  ctx.restore();
+}
+
+// — Draw text chat bubble —
+function drawTextBubble(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, opacity: number) {
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  const display = text.length > 8 ? text.slice(0, 8) + "…" : text;
+  ctx.font = "bold 7px 'Courier New', monospace";
+  const metrics = ctx.measureText(display);
+  const bw = metrics.width + 10;
+  const bh = 14;
+  const bx = x + 8 - bw / 2;
+  const by = y - 32;
+  // Rounded rect background
+  const r = 4;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.beginPath();
+  ctx.moveTo(bx + r, by);
+  ctx.lineTo(bx + bw - r, by);
+  ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+  ctx.lineTo(bx + bw, by + bh - r);
+  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+  ctx.lineTo(bx + r, by + bh);
+  ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+  ctx.lineTo(bx, by + r);
+  ctx.quadraticCurveTo(bx, by, bx + r, by);
+  ctx.fill();
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(x + 4, by + bh);
+  ctx.lineTo(x + 8, by + bh + 4);
+  ctx.lineTo(x + 12, by + bh);
+  ctx.fill();
+  // Text
+  ctx.fillStyle = "#333";
+  ctx.textAlign = "center";
+  ctx.fillText(display, x + 8, by + 10);
+  ctx.restore();
+}
+
+// — Props interface —
+interface PixelRoomUser {
+  id: string;
+  name: string;
+  personalityType?: string | null;
+}
+
+interface PixelRoomProps {
+  onCharacterClick?: (char: { id: string; name: string; personalityType: string; screenX: number; screenY: number }) => void;
+  matchedUserIds?: string[];
+  currentUser?: PixelRoomUser;
 }
 
 // — Main Component —
-export default function PixelRoom() {
+export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUser }: PixelRoomProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const charsRef = useRef<Character[]>([]);
   const ghostCharsRef = useRef<Character[]>([]);
@@ -257,6 +366,17 @@ export default function PixelRoom() {
   const animRef = useRef<number | null>(null);
   const [dimensions, setDimensions] = useState({ w: 375, h: 280 });
   const [userCount, setUserCount] = useState(0);
+
+  // Store props in refs so animation loop can access without dependency changes
+  const onCharClickRef = useRef(onCharacterClick);
+  onCharClickRef.current = onCharacterClick;
+  const matchedIdsRef = useRef<Set<string>>(new Set());
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  useEffect(() => {
+    matchedIdsRef.current = new Set(matchedUserIds || []);
+  }, [matchedUserIds]);
 
   // Generate ghost characters to fill empty slots (up to 8 total)
   const updateGhosts = useCallback((realCount: number, W: number, H: number) => {
@@ -308,13 +428,16 @@ export default function PixelRoom() {
       const res = await fetch("/api/users");
       if (!res.ok) return;
       const data = await res.json();
-      const users = data.users || data || [];
+      const otherUsers = data.users || data || [];
+      // Include current user in the room
+      const me = currentUserRef.current;
+      const users = me ? [{ id: me.id, name: me.name, personalityType: me.personalityType }, ...otherUsers] : otherUsers;
 
       const W = dimensions.w;
       const H = dimensions.h;
       const existing = charsRef.current;
 
-      const updated = users.map((user: { id: string; name?: string; username?: string; personalityType?: string }) => {
+      const updated = users.map((user: { id: string; name?: string; username?: string; personalityType?: string | null }) => {
         const prev = existing.find(c => c.id === user.id);
         if (prev) {
           // Update name/personality if changed, keep position & state
@@ -352,8 +475,8 @@ export default function PixelRoom() {
       charsRef.current = updated;
       setUserCount(updated.length);
       updateGhosts(updated.length, W, H);
-    } catch (e) {
-      console.error("PixelRoom: failed to fetch users", e);
+    } catch {
+      // silently fail
     }
   }, [dimensions, updateGhosts]);
 
@@ -393,6 +516,12 @@ export default function PixelRoom() {
         if (c.emojiTimer > 0) {
           c.emojiTimer--;
           if (c.emojiTimer <= 0) c.emoji = null;
+        }
+
+        // Chat text timer
+        if (c.chatTimer && c.chatTimer > 0) {
+          c.chatTimer--;
+          if (c.chatTimer <= 0) c.chatText = null;
         }
 
         // State machine
@@ -451,6 +580,12 @@ export default function PixelRoom() {
         if (c.state === STATES.CHATTING && c.emojiTimer <= 0 && Math.random() < 0.03) {
           c.emoji = CHAT_EMOJIS[Math.floor(Math.random() * CHAT_EMOJIS.length)];
           c.emojiTimer = 60 + Math.random() * 40;
+        }
+
+        // Random chat text bubble (~every 3-5s per character, only when no emoji/chatText active)
+        if (!c.isGhost && c.emojiTimer <= 0 && (!c.chatTimer || c.chatTimer <= 0) && Math.random() < 0.005) {
+          c.chatText = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+          c.chatTimer = 120;
         }
 
         // Movement
@@ -541,12 +676,23 @@ export default function PixelRoom() {
 
       // Characters
       sorted.forEach(c => {
+        // Draw glow for matched users
+        if (matchedIdsRef.current.has(c.id)) {
+          drawGlow(ctx, c.x, c.y, c.color1, f);
+        }
         const walkFrame = c.state === STATES.WALKING ? c.frame : 0;
         drawPixelChar(ctx, c.x, c.y, c.color1, c.color2, walkFrame, 2);
         drawNameTag(ctx, c.x, c.y, c.name, c.color1);
+        // Draw "me" indicator for current user
+        if (currentUserRef.current && c.id === currentUserRef.current.id) {
+          drawMeIndicator(ctx, c.x, c.y);
+        }
         if (c.emoji && c.emojiTimer > 0) {
           const opacity = c.emojiTimer < 15 ? c.emojiTimer / 15 : 1;
           drawBubble(ctx, c.x, c.y, c.emoji, opacity);
+        } else if (c.chatText && c.chatTimer && c.chatTimer > 0) {
+          const opacity = c.chatTimer < 20 ? c.chatTimer / 20 : 1;
+          drawTextBubble(ctx, c.x, c.y, c.chatText, opacity);
         }
       });
 
@@ -577,6 +723,55 @@ export default function PixelRoom() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Hit-test: find character at canvas coordinates
+  const hitTest = useCallback((canvasX: number, canvasY: number): Character | null => {
+    // Check real characters first (they're on top), then ghosts
+    const chars = charsRef.current;
+    // Reverse so we check top-rendered (higher y) first
+    const sorted = [...chars].sort((a, b) => b.y - a.y);
+    for (const c of sorted) {
+      // Character bounding box: roughly x to x+16, y-2 to y+22 (with scale=2)
+      if (canvasX >= c.x - 4 && canvasX <= c.x + 20 && canvasY >= c.y - 4 && canvasY <= c.y + 38) {
+        return c;
+      }
+    }
+    return null;
+  }, []);
+
+  // Canvas click handler
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !onCharClickRef.current) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    const hit = hitTest(canvasX, canvasY);
+    if (hit && !hit.isGhost) {
+      onCharClickRef.current({
+        id: hit.id,
+        name: hit.name,
+        personalityType: hit.personalityType,
+        screenX: e.clientX,
+        screenY: e.clientY,
+      });
+    }
+  }, [hitTest]);
+
+  // Canvas hover: change cursor when over a character
+  const handleCanvasMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    const hit = hitTest(canvasX, canvasY);
+    canvas.style.cursor = (hit && !hit.isGhost) ? "pointer" : "default";
+  }, [hitTest]);
 
   return (
     <div style={{
@@ -627,6 +822,8 @@ export default function PixelRoom() {
         ref={canvasRef}
         width={dimensions.w}
         height={dimensions.h}
+        onClick={handleCanvasClick}
+        onMouseMove={handleCanvasMove}
         style={{
           width: "100%",
           height: "auto",
@@ -648,9 +845,10 @@ export default function PixelRoom() {
         <span style={{
           fontFamily: "'Courier New', monospace",
           fontSize: 10,
-          color: "#A08060",
+          color: "#000",
+          fontWeight: 700,
         }}>
-          每位登录的伙伴都会出现在这里 ✨ 点击下方发起AI匹配
+          点击小人，发起 AI 同频 ✨
         </span>
       </div>
     </div>

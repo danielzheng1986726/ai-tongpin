@@ -26,6 +26,7 @@ export async function GET() {
         OR: [{ userAId: me.id }, { userBId: me.id }],
       },
       select: {
+        id: true,
         userAId: true,
         userBId: true,
         score: true,
@@ -33,13 +34,15 @@ export async function GET() {
     }),
   ]);
 
-  // Build map: other user ID -> best match score
+  // Build maps: other user ID -> best match score & match ID
   const matchScoreMap = new Map<string, number>();
+  const matchIdMap = new Map<string, string>();
   for (const m of matches) {
     const otherId = m.userAId === me.id ? m.userBId : m.userAId;
     const existing = matchScoreMap.get(otherId);
     if (existing === undefined || m.score > existing) {
       matchScoreMap.set(otherId, m.score);
+      matchIdMap.set(otherId, m.id);
     }
   }
 
@@ -47,6 +50,7 @@ export async function GET() {
   const usersWithScores = users.map((u) => ({
     ...u,
     matchScore: matchScoreMap.get(u.id) ?? null,
+    matchId: matchIdMap.get(u.id) ?? null,
   }));
 
   usersWithScores.sort((a, b) => {
