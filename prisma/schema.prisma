@@ -44,3 +44,14 @@ model Match {
 
   @@map("matches")
 }
+
+model Danmaku {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  username  String
+  message   String
+  color     String   @default("#FFFFFF")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("danmaku")
+}

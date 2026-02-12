@@ -397,6 +397,14 @@ function ReportView({ match }: { match: MatchData }) {
         {/* 底部操作 */}
         <div className="flex flex-col items-center gap-3 pb-8">
           <ShareMatchButton match={match} fusionGradient={fusionGradient} pA={pA} pB={pB} relationQuote={relationQuote} />
+          <a
+            href="https://www.secondme.io/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-teal-500 text-white text-sm font-medium px-6 py-3 rounded-full hover:opacity-90 transition-opacity"
+          >
+            去 SecondMe 开启对话 →
+          </a>
           <Link
             href="/"
             className="inline-block bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"

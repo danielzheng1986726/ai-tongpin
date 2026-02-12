@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   PERSONALITIES,
   type PersonalityKey,
 } from "@/data/personalities";
+import { personalityColors } from "@/data/ambient-conversations";
 import type { PersonalityScores } from "@/lib/personality";
 import html2canvas from "html2canvas";
+import LiveAIChat from "@/components/LiveAIChat";
+import DanmakuOverlay from "@/components/DanmakuOverlay";
+import ChatInput from "@/components/ChatInput";
 
 const PixelRoom = dynamic(() => import("@/components/PixelRoom"), { ssr: false });
 
@@ -46,33 +50,31 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-400 animate-pulse">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-[#0F0B1F]">
+        <div className="text-white/40 animate-pulse">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-[#0F0B1F] to-[#1A1230]">
       <Header user={me} />
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {me ? <DiscoverView currentUser={me} setMe={setMe} /> : <LoginView />}
-      </main>
+      {me ? <DiscoverView currentUser={me} setMe={setMe} /> : <LoginView />}
     </div>
   );
 }
 
 function Header({ user }: { user: UserInfo | null }) {
   return (
-    <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-      <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">同频</h1>
+    <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
+      <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
+        <h1 className="text-base font-semibold text-white/90">同频</h1>
         {user && (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{user.name || "用户"}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-white/50">{user.name || "用户"}</span>
             <a
               href="/api/auth/logout"
-              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-xs text-white/30 hover:text-white/60 transition-colors"
             >
               退出
             </a>
@@ -85,18 +87,18 @@ function Header({ user }: { user: UserInfo | null }) {
 
 function LoginView() {
   return (
-    <div className="flex flex-col items-center pt-24 gap-6">
+    <div className="flex flex-col items-center pt-24 gap-6 px-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-white mb-2">
           找到职场上与你同频的人
         </h2>
-        <p className="text-gray-500">
+        <p className="text-white/50">
           通过 SecondMe AI 深度了解彼此，智能匹配志同道合的职场伙伴
         </p>
       </div>
       <a
         href="/api/auth/login"
-        className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+        className="bg-gradient-to-r from-purple-600 to-teal-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
       >
         使用 SecondMe 登录
       </a>
@@ -114,7 +116,6 @@ function PersonalitySection({
   onUpdate: (u: UserInfo) => void;
 }) {
   const [generating, setGenerating] = useState(false);
-
   const [sharing, setSharing] = useState(false);
 
   const handleShare = async (p: (typeof PERSONALITIES)[PersonalityKey]) => {
@@ -166,7 +167,6 @@ function PersonalitySection({
     document.body.appendChild(container);
 
     try {
-      // Wait a tick for images to load
       await new Promise((r) => setTimeout(r, 100));
       const canvas = await html2canvas(container, {
         scale: 2,
@@ -193,7 +193,7 @@ function PersonalitySection({
   if (user.personalityType && PERSONALITIES[user.personalityType as PersonalityKey]) {
     const p = PERSONALITIES[user.personalityType as PersonalityKey];
     return (
-      <div className="mb-8 animate-fade-up">
+      <div className="animate-fade-up">
         <PersonalityCard user={user} personality={p} />
         <div className="mt-4 text-center">
           <button
@@ -229,19 +229,19 @@ function PersonalitySection({
   };
 
   return (
-    <div className="mb-8">
-      <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+    <div>
+      <div className="bg-white/5 rounded-2xl border border-white/10 p-8 text-center">
         <div className="text-4xl mb-4">✦</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-white mb-2">
           发现你的职场人格
         </h3>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-white/50 mb-6">
           基于你的 AI 画像，生成专属职场人格卡片
         </p>
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+          className="bg-gradient-to-r from-purple-600 to-teal-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {generating ? (
             <span className="flex items-center gap-2">
@@ -273,7 +273,6 @@ function PersonalityCard({
       style={{ background: p.colors.gradient, color: p.colors.text }}
     >
       <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center">
-        {/* 头像 */}
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
@@ -289,27 +288,22 @@ function PersonalityCard({
           </div>
         )}
 
-        {/* 人格名称 */}
         <div className="text-3xl font-bold tracking-wider mb-1">
           ✦ {p.name} ✦
         </div>
         <div className="text-sm opacity-60 mb-4">{p.nameEn}</div>
 
-        {/* 金句 */}
         <p className="text-lg opacity-80 mb-5 italic">{p.quote}</p>
 
-        {/* 特质标签 */}
         <p className="text-lg opacity-70 mb-6">
           {p.traits.join(" · ")}
         </p>
 
-        {/* 分隔线 */}
         <div
           className="w-full h-px mb-5"
           style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
         />
 
-        {/* 社交关系 */}
         <div className="w-full flex justify-center gap-8 text-sm mb-5">
           <div>
             <span className="opacity-60">最佳拍档: </span>
@@ -329,10 +323,8 @@ function PersonalityCard({
           </div>
         </div>
 
-        {/* 稀缺度 */}
         <p className="text-xs opacity-50 mb-6">{p.rarityText}</p>
 
-        {/* 品牌 */}
         <div className="text-xs opacity-40">
           <div className="font-semibold">同频</div>
           <div>ai-tongpin.vercel.app</div>
@@ -355,6 +347,11 @@ function DiscoverView({
   const [users, setUsers] = useState<OtherUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [matchingId, setMatchingId] = useState<string | null>(null);
+  const [showFullCard, setShowFullCard] = useState(false);
+  const [danmakuMessages, setDanmakuMessages] = useState<{ text: string; username: string; color?: string }[]>([]);
+  const danmakuPool = useRef<{ text: string; username: string; color?: string }[]>([]);
+  const danmakuIndex = useRef(0);
+  const lastDanmakuTime = useRef<string>(new Date().toISOString());
 
   useEffect(() => {
     fetch("/api/users")
@@ -365,6 +362,89 @@ function DiscoverView({
       })
       .catch(() => setLoadingUsers(false));
   }, []);
+
+  // 加载历史弹幕 + 循环播放
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/danmaku");
+        const data = await res.json();
+        if (data.messages?.length > 0) {
+          danmakuPool.current = data.messages.map((m: { message: string; username: string; color: string; createdAt: string }) => ({
+            text: m.message,
+            username: m.username,
+            color: m.color || "#E0E7FF",
+          }));
+          lastDanmakuTime.current = data.messages[data.messages.length - 1].createdAt;
+        }
+      } catch {
+        // silently fail
+      }
+
+      // 循环播放弹幕池
+      while (!cancelled) {
+        if (danmakuPool.current.length > 0) {
+          const msg = danmakuPool.current[danmakuIndex.current % danmakuPool.current.length];
+          setDanmakuMessages(prev => [...prev, msg]);
+          danmakuIndex.current++;
+        }
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // 轮询新弹幕，加入循环池
+  useEffect(() => {
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/danmaku?after=${encodeURIComponent(lastDanmakuTime.current)}`);
+        const data = await res.json();
+        if (data.messages?.length > 0) {
+          const newMsgs = data.messages.map((m: { message: string; username: string; color: string }) => ({
+            text: m.message,
+            username: m.username,
+            color: m.color || "#E0E7FF",
+          }));
+          danmakuPool.current = [...danmakuPool.current, ...newMsgs];
+          lastDanmakuTime.current = data.messages[data.messages.length - 1].createdAt;
+        }
+      } catch {
+        // silently fail
+      }
+    }, 5000);
+    return () => clearInterval(poll);
+  }, []);
+
+  // 发送弹幕
+  const handleSendDanmaku = async (message: string) => {
+    const pType = currentUser.personalityType as string | undefined;
+    const color = pType && personalityColors[pType]
+      ? personalityColors[pType].to
+      : "#E0E7FF";
+
+    const dmMsg = { text: message, username: currentUser.name || "用户", color };
+    setDanmakuMessages(prev => [...prev, dmMsg]);
+    danmakuPool.current = [...danmakuPool.current, dmMsg];
+
+    try {
+      await fetch("/api/danmaku", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          username: currentUser.name || "用户",
+          message,
+          color,
+        }),
+      });
+    } catch {
+      // silently fail
+    }
+  };
 
   const startMatch = useCallback(
     async (targetId: string) => {
@@ -386,46 +466,94 @@ function DiscoverView({
     [router]
   );
 
+  // 给 LiveAIChat 用的用户列表（包含当前用户）
+  const allUsersForChat = [
+    { id: currentUser.id, username: currentUser.name || "用户", personalityType: currentUser.personalityType },
+    ...users.map(u => ({
+      id: u.id,
+      username: u.name || "用户",
+      personalityType: u.personalityType,
+    })),
+  ];
+
+  // 人格信息
+  const pKey = currentUser.personalityType as PersonalityKey | null;
+  const personality = pKey ? PERSONALITIES[pKey] : null;
+
   return (
-    <div>
-      {/* 像素小屋 */}
-      <PixelRoom />
-
-      {/* 人格卡片 */}
-      <PersonalitySection user={currentUser} onUpdate={setMe} />
-
-      {/* 用户列表 */}
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">发现</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          点击用户卡片，AI 将深度对话分析你们的匹配度
-        </p>
+    <main className="flex flex-col">
+      {/* 像素小屋 + 弹幕 */}
+      <div className="relative w-full max-w-lg mx-auto" style={{ minHeight: "420px" }}>
+        <PixelRoom />
+        <DanmakuOverlay messages={danmakuMessages} />
       </div>
 
-      {loadingUsers ? (
-        <div className="text-center py-20 text-gray-400 animate-pulse">
-          加载用户列表...
-        </div>
-      ) : users.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-gray-500 mb-2">暂时没有其他用户</p>
-          <p className="text-sm text-gray-400">
-            邀请朋友使用 SecondMe 登录，即可开始匹配
+      {/* 弹幕输入框 */}
+      <div className="w-full max-w-lg mx-auto">
+        <ChatInput
+          onSend={handleSendDanmaku}
+          disabled={!currentUser}
+          username={currentUser.name || undefined}
+        />
+      </div>
+
+      {/* AI 实时聊天 */}
+      <LiveAIChat users={allUsersForChat} />
+
+      {/* 人格卡片 - 折叠版 */}
+      <div className="w-full max-w-lg mx-auto px-4 mt-2">
+        <button
+          onClick={() => setShowFullCard(!showFullCard)}
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-white/5 rounded-xl border border-white/10 hover:bg-white/8 transition-colors"
+        >
+          <span className="text-sm text-white/70">
+            🔮 看一看你的职场人格是什么？
+          </span>
+          <span className="text-xs text-white/30">
+            {showFullCard ? "▲ 收起" : "▼ 展开"}
+          </span>
+        </button>
+        {showFullCard && (
+          <div className="mt-2">
+            <PersonalitySection user={currentUser} onUpdate={setMe} />
+          </div>
+        )}
+      </div>
+
+      {/* 用户列表 */}
+      <div className="w-full max-w-lg mx-auto px-4 mt-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-white/90">发现</h2>
+          <p className="text-xs text-white/40 mt-1">
+            点击用户卡片，AI 将深度对话分析你们的匹配度
           </p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {users.map((user) => (
-            <UserCard
-              key={user.id}
-              user={user}
-              isMatching={matchingId === user.id}
-              onMatch={() => startMatch(user.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+
+        {loadingUsers ? (
+          <div className="text-center py-12 text-white/30 animate-pulse">
+            加载用户列表...
+          </div>
+        ) : users.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-white/40 mb-2">暂时没有其他用户</p>
+            <p className="text-sm text-white/25">
+              邀请朋友使用 SecondMe 登录，即可开始匹配
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {users.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                isMatching={matchingId === user.id}
+                onMatch={() => startMatch(user.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
 
@@ -444,27 +572,27 @@ function UserCard({
     : null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 transition-colors">
-      <div className="flex items-start gap-4">
+    <div className="bg-white/5 rounded-xl border border-white/10 p-4 hover:bg-white/8 transition-colors">
+      <div className="flex items-start gap-3">
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt=""
-            className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-lg flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/40 text-sm flex-shrink-0">
             {(user.name || "U")[0]}
           </div>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-gray-900 truncate">
+            <h3 className="font-medium text-white/90 truncate text-sm">
               {user.name || "未设置昵称"}
             </h3>
             {personality && (
               <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
                 style={{
                   background: personality.colors.gradient,
                   color: personality.colors.text,
@@ -474,24 +602,24 @@ function UserCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-400 italic truncate">
+          <p className="text-xs text-white/30 italic truncate">
             {personality ? personality.quote : "刚搬进同频小屋，还在收拾行李🧳"}
           </p>
         </div>
       </div>
 
       {shades.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
+        <div className="flex flex-wrap gap-1 mt-2.5">
           {shades.slice(0, 5).map((s, i) => (
             <span
               key={i}
-              className="text-xs px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full"
+              className="text-[10px] px-1.5 py-0.5 bg-white/5 text-white/40 rounded-full"
             >
               {s}
             </span>
           ))}
           {shades.length > 5 && (
-            <span className="text-xs px-2 py-0.5 text-gray-400">
+            <span className="text-[10px] px-1.5 py-0.5 text-white/20">
               +{shades.length - 5}
             </span>
           )}
@@ -501,7 +629,7 @@ function UserCard({
       <button
         onClick={onMatch}
         disabled={isMatching}
-        className="mt-4 w-full text-sm font-medium py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-900 text-white hover:bg-gray-800"
+        className="mt-3 w-full text-xs font-medium py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-purple-600/80 to-teal-500/80 text-white hover:opacity-90"
       >
         {isMatching ? "匹配中..." : "发起 AI 匹配"}
       </button>
@@ -519,7 +647,6 @@ function parseShades(shadesJson: string | null): string[] {
         if (typeof s === "string") return s;
         if (s && typeof s === "object") {
           const obj = s as Record<string, unknown>;
-          // Try common field names, then fall back to first string value
           for (const key of ["name", "label", "title", "text"]) {
             if (typeof obj[key] === "string") return obj[key] as string;
           }
