@@ -79,7 +79,9 @@ export default function DanmakuOverlay({ messages }: DanmakuOverlayProps) {
           }}
         >
           <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+              /^\p{Emoji}$/u.test(item.text) ? "text-xl" : "text-xs"
+            }`}
             style={{
               color: item.color,
               textShadow:
@@ -87,7 +89,9 @@ export default function DanmakuOverlay({ messages }: DanmakuOverlayProps) {
               backgroundColor: "rgba(0,0,0,0.3)",
             }}
           >
-            <span className="opacity-60">{item.username}</span>
+            {!/^\p{Emoji}$/u.test(item.text) && (
+              <span className="opacity-60 text-xs">{item.username}</span>
+            )}
             <span>{item.text}</span>
           </span>
         </div>

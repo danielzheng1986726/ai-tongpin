@@ -79,3 +79,66 @@ model Danmaku {
 
   @@map("danmaku")
 }
+
+model AIHighlight {
+  id        String   @id @default(cuid())
+  content   String
+  topic     String
+  speakerA  String   @map("speaker_a")
+  speakerB  String   @map("speaker_b")
+  likes     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_highlights")
+}
+
+model Room {
+  id               String        @id @default(cuid())
+  name             String
+  shareCode        String        @unique @map("share_code")
+  status           String        @default("waiting")
+  currentRound     Int           @default(0) @map("current_round")
+  maxRounds        Int           @default(2) @map("max_rounds")
+  autoAdvance      Boolean       @default(true) @map("auto_advance")
+  countdownSeconds Int           @default(30) @map("countdown_seconds")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  members          RoomMember[]
+  pairings         RoundPairing[]
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id              String         @id @default(cuid())
+  roomId          String         @map("room_id")
+  room            Room           @relation(fields: [roomId], references: [id])
+  nickname        String
+  personalityType String         @map("personality_type")
+  surveyAnswers   String         @map("survey_answers")
+  avatarSeed      Int            @default(0) @map("avatar_seed")
+  isCreator       Boolean        @default(false) @map("is_creator")
+  joinedAt        DateTime       @default(now()) @map("joined_at")
+  pairingsA       RoundPairing[] @relation("memberA")
+  pairingsB       RoundPairing[] @relation("memberB")
+
+  @@map("room_members")
+}
+
+model RoundPairing {
+  id               String     @id @default(cuid())
+  roomId           String     @map("room_id")
+  room             Room       @relation(fields: [roomId], references: [id])
+  round            Int
+  memberAId        String     @map("member_a_id")
+  memberA          RoomMember @relation("memberA", fields: [memberAId], references: [id])
+  memberBId        String     @map("member_b_id")
+  memberB          RoomMember @relation("memberB", fields: [memberBId], references: [id])
+  conversationData String     @default("[]") @map("conversation_data")
+  highlights       String     @default("[]")
+  matchScore       Int        @default(0) @map("match_score")
+  status           String     @default("pending")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  @@map("round_pairings")
+}

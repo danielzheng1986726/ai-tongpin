@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useContext } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -14,6 +14,10 @@ import TopicForum from "@/components/TopicForum";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
 import ChatInput from "@/components/ChatInput";
 import PersonalityReveal from "@/components/PersonalityReveal";
+import { AIConversationProvider, AIConversationContext } from "@/contexts/AIConversationContext";
+import AIHighlights from "@/components/AIHighlights";
+import DailyBest from "@/components/DailyBest";
+import LiveAIChat from "@/components/LiveAIChat";
 
 const PixelRoom = dynamic(() => import("@/components/PixelRoom"), { ssr: false });
 
@@ -86,10 +90,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0F0B1F] to-[#1A1230]">
-      <Header user={me} />
-      {me ? <DiscoverView currentUser={me} setMe={setMe} /> : <LoginView />}
-    </div>
+    <AIConversationProvider>
+      <div className="min-h-screen bg-gradient-to-b from-[#0F0B1F] to-[#1A1230]">
+        <Header user={me} />
+        {me ? <DiscoverView currentUser={me} setMe={setMe} /> : <LoginView />}
+      </div>
+    </AIConversationProvider>
   );
 }
 
@@ -517,14 +523,26 @@ function DiscoverView({
     router.push(`/match/${matchId}`);
   }, [router]);
 
+  // AI conversation context for PixelRoom bubbles
+  const { currentSpeaker, currentMessage } = useContext(AIConversationContext);
+
+  // Build user list for LiveAIChat (needs username field)
+  const liveAIChatUsers = [
+    { id: currentUser.id, username: currentUser.name || "用户", personalityType: currentUser.personalityType },
+    ...users.map(u => ({ id: u.id, username: u.name || "???", personalityType: u.personalityType })),
+  ];
+
   return (
     <main className="flex flex-col">
-      {/* 像素小屋 + 弹幕 */}
+      {/* 1. 像素小屋 + 金句浮动层 + 弹幕（最大面积） */}
       <div className="relative w-full max-w-lg mx-auto" style={{ minHeight: "420px" }}>
+        <AIHighlights />
         <PixelRoom
           onCharacterClick={handleCharClick}
           matchedUserIds={matchedUserIds}
           currentUser={{ id: currentUser.id, name: currentUser.name || "用户", personalityType: currentUser.personalityType }}
+          aiSpeaker={currentSpeaker}
+          aiMessage={currentMessage}
         />
         <DanmakuOverlay messages={danmakuMessages} />
       </div>
@@ -542,7 +560,7 @@ function DiscoverView({
         />
       )}
 
-      {/* 弹幕输入框 */}
+      {/* 弹幕输入框 + emoji 快捷按钮 */}
       <div className="w-full max-w-lg mx-auto">
         <ChatInput
           onSend={handleSendDanmaku}
@@ -550,6 +568,12 @@ function DiscoverView({
           username={currentUser.name || undefined}
         />
       </div>
+
+      {/* 2. AI 实时聊天面板（第二面积） */}
+      <LiveAIChat users={liveAIChatUsers} />
+
+      {/* 3. 今日热梗卡片区（第三面积） */}
+      <DailyBest />
 
       {/* 话题盖楼 */}
       <TopicForum />
@@ -575,7 +599,7 @@ function DiscoverView({
       </div>
 
       {/* 用户列表 - 默认折叠 */}
-      <div className="w-full max-w-lg mx-auto px-4 mt-6 mb-8">
+      <div className="w-full max-w-lg mx-auto px-4 mt-6">
         <button
           onClick={() => setShowUserList(!showUserList)}
           className="w-full flex items-center justify-between px-4 py-2.5 bg-white/5 rounded-xl border border-white/10 hover:bg-white/8 transition-colors"
@@ -616,6 +640,25 @@ function DiscoverView({
             )}
           </div>
         )}
+      </div>
+
+      {/* B 端入口 */}
+      <div className="w-full max-w-lg mx-auto px-4 mt-8 mb-8">
+        <div className="rounded-xl p-4 bg-white/5 border border-white/5 text-center">
+          <p className="text-sm text-white/60">
+            想用同频给团队做一场 AI 破冰？
+          </p>
+          <button
+            className="mt-2 text-xs px-4 py-1.5 rounded-full
+              bg-gradient-to-r from-purple-600/30 to-teal-500/30
+              text-white/70 hover:text-white
+              border border-white/10 hover:border-white/20
+              transition-all"
+            onClick={() => alert('功能即将上线！如需体验请联系 Daniel。')}
+          >
+            敬请期待
+          </button>
+        </div>
       </div>
     </main>
   );

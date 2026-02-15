@@ -355,10 +355,12 @@ interface PixelRoomProps {
   onCharacterClick?: (char: { id: string; name: string; personalityType: string; screenX: number; screenY: number }) => void;
   matchedUserIds?: string[];
   currentUser?: PixelRoomUser;
+  aiSpeaker?: string | null;
+  aiMessage?: string | null;
 }
 
 // — Main Component —
-export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUser }: PixelRoomProps) {
+export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUser, aiSpeaker, aiMessage }: PixelRoomProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const charsRef = useRef<Character[]>([]);
   const ghostCharsRef = useRef<Character[]>([]);
@@ -373,6 +375,13 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
   const matchedIdsRef = useRef<Set<string>>(new Set());
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+
+  // AI conversation bubble refs
+  const aiSpeakerRef = useRef(aiSpeaker);
+  const aiMessageRef = useRef(aiMessage);
+  const aiBubbleTimerRef = useRef(0);
+  aiSpeakerRef.current = aiSpeaker;
+  aiMessageRef.current = aiMessage;
 
   useEffect(() => {
     matchedIdsRef.current = new Set(matchedUserIds || []);
@@ -695,6 +704,17 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
           drawTextBubble(ctx, c.x, c.y, c.chatText, opacity);
         }
       });
+
+      // AI conversation bubble overlay
+      const speaker = aiSpeakerRef.current;
+      const aiMsg = aiMessageRef.current;
+      if (speaker && aiMsg) {
+        const speakerChar = chars.find(c => c.name === speaker);
+        if (speakerChar) {
+          const truncMsg = aiMsg.length > 10 ? aiMsg.slice(0, 10) + "…" : aiMsg;
+          drawTextBubble(ctx, speakerChar.x, speakerChar.y, truncMsg, 0.95);
+        }
+      }
 
       // Online count
       ctx.save();

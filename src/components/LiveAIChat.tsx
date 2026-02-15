@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useContext } from "react";
 import {
   ambientConversations,
   personalityColors,
 } from "@/data/ambient-conversations";
+import { AIConversationContext } from "@/contexts/AIConversationContext";
 
 interface User {
   id: string;
@@ -27,11 +28,16 @@ export default function LiveAIChat({ users }: LiveAIChatProps) {
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const aiConversation = useContext(AIConversationContext);
 
   const usersWithPersonality = useMemo(
     () => users.filter((u) => u.personalityType),
     [users]
   );
+
+  // Store context functions in ref so playConversationFn can access without dependency changes
+  const aiConvRef = useRef(aiConversation);
+  aiConvRef.current = aiConversation;
 
   const generateConversationRef = useRef<() => ReturnType<typeof generateConversationFn> | null>(null);
 
@@ -79,12 +85,23 @@ export default function LiveAIChat({ users }: LiveAIChatProps) {
     setMessages([]);
     setCurrentTopic(conv.topic);
 
+    // Broadcast topic info to context (for AIHighlights & PixelRoom)
+    const allUsers = Object.values(assignedUsers);
+    aiConvRef.current.setTopicInfo(
+      conv.topic,
+      allUsers[0]?.username || "",
+      allUsers[1]?.username || ""
+    );
+
     for (let i = 0; i < conv.messages.length; i++) {
       const msg = conv.messages[i];
       const user = assignedUsers[msg.personality];
       const pType = user.personalityType || msg.personality;
 
       await new Promise((r) => setTimeout(r, 2500 + Math.random() * 1500));
+
+      // Broadcast current speaker to context
+      aiConvRef.current.broadcast(user.username, msg.text);
 
       setMessages((prev) => [
         ...prev,

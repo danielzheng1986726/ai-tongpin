@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import EmojiReactions from "@/components/EmojiReactions";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -54,6 +55,7 @@ export default function ChatInput({
         >
           发送
         </button>
+        <EmojiReactions onSend={(emoji) => !disabled && onSend(emoji)} />
       </div>
     </div>
   );

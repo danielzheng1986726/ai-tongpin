@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人格揭示 - 预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #0F0B1F, #1A1230);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+
+  /* 顶部人格切换器 */
+  .switcher {
+    position: fixed;
+    top: 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0 16px;
+    z-index: 100;
+  }
+  .switcher button {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .switcher button:hover, .switcher button.active {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+  }
+
+  /* 卡牌容器 */
+  .card-wrapper {
+    perspective: 1200px;
+  }
+  .card {
+    width: 280px;
+    height: 420px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.8s ease-in-out;
+  }
+  .card.flipped {
+    transform: rotateY(180deg);
+  }
+
+  /* 公共面 */
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* 背面 */
+  .card-back {
+    background: linear-gradient(135deg, #1E1640, #2A1B5E);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-back .pattern {
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.5) 28px, rgba(255,255,255,0.5) 29px),
+      repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.5) 28px, rgba(255,255,255,0.5) 29px),
+      repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.3) 40px, rgba(255,255,255,0.3) 41px),
+      repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.3) 40px, rgba(255,255,255,0.3) 41px);
+  }
+  .card-back .border-outer {
+    position: absolute;
+    inset: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+  }
+  .card-back .border-inner {
+    position: absolute;
+    inset: 24px;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 4px;
+  }
+  .card-back .logo {
+    font-size: 28px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 8px;
+    z-index: 1;
+  }
+  .card-back .sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.12);
+    margin-top: 8px;
+    letter-spacing: 4px;
+    z-index: 1;
+  }
+
+  /* 正面 */
+  .card-front {
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .card-front .emoji {
+    font-size: 56px;
+    margin-bottom: 16px;
+    line-height: 1;
+  }
+  .card-front .name {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    margin-bottom: 4px;
+  }
+  .card-front .name-en {
+    font-size: 14px;
+    opacity: 0.6;
+    margin-bottom: 24px;
+  }
+  .card-front .divider {
+    width: 40px;
+    height: 1px;
+    background: rgba(255,255,255,0.3);
+    margin-bottom: 24px;
+  }
+  .card-front .quote {
+    font-size: 15px;
+    opacity: 0.85;
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  /* 按钮 */
+  .enter-btn {
+    margin-top: 48px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .enter-btn.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .enter-btn button {
+    background: linear-gradient(to right, #9333ea, #14b8a6);
+    color: #fff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .enter-btn button:hover {
+    opacity: 0.9;
+  }
+
+  /* 重播按钮 */
+  .replay-hint {
+    position: fixed;
+    bottom: 24px;
+    color: rgba(255,255,255,0.25);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- 切换人格 -->
+<div class="switcher" id="switcher"></div>
+
+<!-- 卡牌 -->
+<div class="card-wrapper">
+  <div class="card" id="card">
+    <!-- 背面 -->
+    <div class="card-face card-back">
+      <div class="pattern"></div>
+      <div class="border-outer"></div>
+      <div class="border-inner"></div>
+      <div class="logo">同频</div>
+      <div class="sub">TONGPIN</div>
+    </div>
+    <!-- 正面 -->
+    <div class="card-face card-front" id="cardFront">
+      <div class="emoji" id="emoji"></div>
+      <div class="name" id="name"></div>
+      <div class="name-en" id="nameEn"></div>
+      <div class="divider"></div>
+      <div class="quote" id="quote"></div>
+    </div>
+  </div>
+</div>
+
+<div class="enter-btn" id="enterBtn">
+  <button onclick="replay()">✨ 进入同频小屋</button>
+</div>
+
+<div class="replay-hint">点击按钮可重播动画 · 点击上方切换人格</div>
+
+<script>
+const personalities = {
+  spark:        { name: "星火", nameEn: "Spark",         emoji: "✨", quote: "最好的计划，就是先干起来",             gradient: "linear-gradient(135deg, #FF6B35, #FF2D55)", color: "#FFFFFF" },
+  deepsea:      { name: "深海", nameEn: "Deep Sea",      emoji: "🌊", quote: "别人看到表面，你看到结构",             gradient: "linear-gradient(135deg, #0F4C75, #1B98E0)", color: "#FFFFFF" },
+  aurora:       { name: "极光", nameEn: "Aurora",         emoji: "🌌", quote: "最有趣的事，发生在边界上",             gradient: "linear-gradient(135deg, #7B2FF7, #22D1EE)", color: "#FFFFFF" },
+  warmsun:      { name: "暖阳", nameEn: "Warm Sun",       emoji: "☀️", quote: "成就别人，就是成就自己",              gradient: "linear-gradient(135deg, #FF9A3C, #FFD93D)", color: "#5C3D00" },
+  bedrock:      { name: "磐石", nameEn: "Bedrock",        emoji: "🪨", quote: "靠谱这件事，永远不会过时",             gradient: "linear-gradient(135deg, #0D9488, #2DD4BF)", color: "#FFFFFF" },
+  lightning:    { name: "闪电", nameEn: "Lightning",      emoji: "⚡", quote: "速度本身就是一种战略",                gradient: "linear-gradient(135deg, #E11D48, #FB923C)", color: "#FFFFFF" },
+  brightmoon:   { name: "明月", nameEn: "Bright Moon",    emoji: "🌙", quote: "慢一步想清楚，快十步走对路",           gradient: "linear-gradient(135deg, #4338CA, #818CF8)", color: "#FFFFFF" },
+  springbreeze: { name: "春风", nameEn: "Spring Breeze",  emoji: "🌸", quote: "最好的影响力，是让人感觉不到你在影响", gradient: "linear-gradient(135deg, #059669, #34D399)", color: "#FFFFFF" },
+};
+
+let current = "aurora";
+let timer1, timer2;
+
+// 生成切换按钮
+const switcher = document.getElementById("switcher");
+Object.keys(personalities).forEach(key => {
+  const btn = document.createElement("button");
+  btn.textContent = personalities[key].emoji + " " + personalities[key].name;
+  btn.dataset.key = key;
+  btn.onclick = () => { current = key; replay(); };
+  switcher.appendChild(btn);
+});
+
+function updateSwitcherActive() {
+  switcher.querySelectorAll("button").forEach(b => {
+    b.classList.toggle("active", b.dataset.key === current);
+  });
+}
+
+function render(key) {
+  const p = personalities[key];
+  const front = document.getElementById("cardFront");
+  front.style.background = p.gradient;
+  front.style.color = p.color;
+  document.getElementById("emoji").textContent = p.emoji;
+  document.getElementById("name").textContent = p.name;
+  document.getElementById("nameEn").textContent = p.nameEn;
+  document.getElementById("quote").textContent = "「" + p.quote + "」";
+  updateSwitcherActive();
+}
+
+function replay() {
+  clearTimeout(timer1);
+  clearTimeout(timer2);
+  const card = document.getElementById("card");
+  const btn = document.getElementById("enterBtn");
+
+  card.classList.remove("flipped");
+  btn.classList.remove("show");
+  render(current);
+
+  timer1 = setTimeout(() => card.classList.add("flipped"), 1000);
+  timer2 = setTimeout(() => btn.classList.add("show"), 2000);
+}
+
+// 初始播放
+replay();
+</script>
+</body>
+</html>
