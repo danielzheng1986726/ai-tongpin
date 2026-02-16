@@ -5,12 +5,14 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getExternalBaseUrl } from "@/lib/url";
 
 export async function GET(request: NextRequest) {
+  const baseUrl = getExternalBaseUrl(request);
   const code = request.nextUrl.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/?error=no_code", request.url));
+    return NextResponse.redirect(new URL("/?error=no_code", baseUrl));
   }
 
   try {
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
     const tokenResult = await exchangeCodeForToken(code);
     if (tokenResult.code !== 0) {
       return NextResponse.redirect(
-        new URL("/?error=token_exchange", request.url)
+        new URL("/?error=token_exchange", baseUrl)
       );
     }
 
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     const userResult = await fetchSecondMeUserInfo(accessToken);
     if (userResult.code !== 0) {
       return NextResponse.redirect(
-        new URL("/?error=user_info", request.url)
+        new URL("/?error=user_info", baseUrl)
       );
     }
 
@@ -76,11 +78,11 @@ export async function GET(request: NextRequest) {
     // 5. 设置 session cookie
     await setSessionCookie(user.id);
 
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/", baseUrl));
   } catch (error) {
     console.error("OAuth callback error:", error);
     return NextResponse.redirect(
-      new URL("/?error=callback_failed", request.url)
+      new URL("/?error=callback_failed", baseUrl)
     );
   }
 }
