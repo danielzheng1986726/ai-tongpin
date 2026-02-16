@@ -31,7 +31,44 @@ const CHAT_LINES = [
   "说不定可以合作", "有些事急不来", "越聊越有感觉",
 ];
 
-// — Pixel character sprite drawer —
+// — Sprite image loading —
+const SPRITE_SIZE = 36; // display size in canvas
+const SPRITE_OFFSET_X = 8 - SPRITE_SIZE / 2; // center horizontally at x+8
+const SPRITE_OFFSET_Y = -8; // shift up so feet align roughly with old position
+
+const spriteImages: Record<string, HTMLImageElement> = {};
+const spriteLoadStatus: Record<string, boolean> = {};
+
+function loadSprite(key: string): HTMLImageElement | null {
+  if (spriteImages[key]) return spriteLoadStatus[key] ? spriteImages[key] : null;
+  const img = new Image();
+  img.src = `/sprites/${key}.png`;
+  spriteImages[key] = img;
+  spriteLoadStatus[key] = false;
+  img.onload = () => { spriteLoadStatus[key] = true; };
+  img.onerror = () => { spriteLoadStatus[key] = false; };
+  return null;
+}
+
+// Preload all personality sprites
+const PERSONALITY_SPRITE_KEYS = ["spark","deepsea","aurora","warmsun","bedrock","lightning","brightmoon","springbreeze"];
+if (typeof window !== "undefined") {
+  PERSONALITY_SPRITE_KEYS.forEach(k => loadSprite(k));
+}
+
+// — Draw character using sprite image —
+function drawSpriteChar(ctx: CanvasRenderingContext2D, x: number, y: number, personalityType: string, _frame: number) {
+  const img = loadSprite(personalityType);
+  if (img) {
+    ctx.drawImage(img, x + SPRITE_OFFSET_X, y + SPRITE_OFFSET_Y, SPRITE_SIZE, SPRITE_SIZE);
+  } else {
+    // Fallback to old pixel drawing if sprite not loaded
+    const colors = PERSONALITY_COLORS[personalityType] || PERSONALITY_COLORS.aurora;
+    drawPixelChar(ctx, x, y, colors.primary, colors.secondary, _frame, 2);
+  }
+}
+
+// — Pixel character sprite drawer (used for ghosts + fallback) —
 function drawPixelChar(ctx: CanvasRenderingContext2D, x: number, y: number, color1: string, color2: string, frame: number, scale = 2) {
   const s = scale;
   // Head
@@ -176,7 +213,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, emoji: 
   ctx.globalAlpha = opacity;
   ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.beginPath();
-  ctx.arc(x + 8, y - 16, 12, 0, Math.PI * 2);
+  ctx.arc(x + 8, y - 22, 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(0,0,0,0.1)";
   ctx.lineWidth = 1;
@@ -184,14 +221,14 @@ function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, emoji: 
   // Bubble tail
   ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.beginPath();
-  ctx.moveTo(x + 4, y - 6);
-  ctx.lineTo(x + 8, y - 2);
-  ctx.lineTo(x + 12, y - 6);
+  ctx.moveTo(x + 4, y - 12);
+  ctx.lineTo(x + 8, y - 7);
+  ctx.lineTo(x + 12, y - 12);
   ctx.fill();
   // Emoji
   ctx.font = "11px serif";
   ctx.textAlign = "center";
-  ctx.fillText(emoji, x + 8, y - 12);
+  ctx.fillText(emoji, x + 8, y - 18);
   ctx.restore();
 }
 
@@ -204,7 +241,7 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, y: number, name: 
   const tagW = metrics.width + 8;
   const tagH = 12;
   const tagX = x + 8 - tagW/2;
-  const tagY = y + 24;
+  const tagY = y + 30;
   ctx.fillStyle = color;
   ctx.globalAlpha = 0.85;
   const r = 3;
@@ -289,7 +326,7 @@ function drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, color: st
 function drawMeIndicator(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.save();
   const cx = x + 8;
-  const top = y - 28;
+  const top = y - 34;
   // Small downward triangle
   ctx.fillStyle = "#FFF";
   ctx.globalAlpha = 0.9;
@@ -316,7 +353,7 @@ function drawTextBubble(ctx: CanvasRenderingContext2D, x: number, y: number, tex
   const bw = metrics.width + 10;
   const bh = 14;
   const bx = x + 8 - bw / 2;
-  const by = y - 32;
+  const by = y - 38;
   // Rounded rect background
   const r = 4;
   ctx.fillStyle = "rgba(255,255,255,0.85)";
@@ -334,7 +371,7 @@ function drawTextBubble(ctx: CanvasRenderingContext2D, x: number, y: number, tex
   // Tail
   ctx.beginPath();
   ctx.moveTo(x + 4, by + bh);
-  ctx.lineTo(x + 8, by + bh + 4);
+  ctx.lineTo(x + 8, by + bh + 6);
   ctx.lineTo(x + 12, by + bh);
   ctx.fill();
   // Text
@@ -407,12 +444,14 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
       } else {
         // Spread initial positions evenly using deterministic seeding
         const seed = i / ghostCount;
+        const ghostType = PERSONALITY_SPRITE_KEYS[i % PERSONALITY_SPRITE_KEYS.length];
+        const ghostColors = PERSONALITY_COLORS[ghostType] || PERSONALITY_COLORS.aurora;
         ghosts.push({
           id: `ghost-${i}`,
           name: "",
-          personalityType: "",
-          color1: "#9CA3AF",
-          color2: "#9CA3AF",
+          personalityType: ghostType,
+          color1: ghostColors.primary,
+          color2: ghostColors.secondary,
           x: 30 + seed * (W - 60) + (Math.sin(i * 7.3) * 30),
           y: 55 + (Math.cos(i * 4.1) * 0.5 + 0.5) * (H - 120),
           targetX: 0,
@@ -616,8 +655,8 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
         }
 
         // Bounds
-        c.x = Math.max(10, Math.min(W - 26, c.x));
-        c.y = Math.max(44, Math.min(H - 46, c.y));
+        c.x = Math.max(12, Math.min(W - 28, c.x));
+        c.y = Math.max(50, Math.min(H - 50, c.y));
       });
 
       // — Update ghosts —
@@ -655,8 +694,8 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
           g.x += Math.sin(f * 0.015 + g.x) * 0.03;
         }
 
-        g.x = Math.max(10, Math.min(W - 26, g.x));
-        g.y = Math.max(44, Math.min(H - 46, g.y));
+        g.x = Math.max(12, Math.min(W - 28, g.x));
+        g.y = Math.max(50, Math.min(H - 50, g.y));
       });
 
       // — Render —
@@ -666,10 +705,9 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
       // Draw ghosts first (behind real users)
       const sortedGhosts = [...ghosts].sort((a, b) => a.y - b.y);
       ctx.save();
-      ctx.globalAlpha = 0.25;
+      ctx.globalAlpha = 0.2;
       sortedGhosts.forEach(g => {
-        const walkFrame = g.state === STATES.WALKING ? g.frame : 0;
-        drawPixelChar(ctx, g.x, g.y, g.color1, g.color2, walkFrame, 2);
+        drawSpriteChar(ctx, g.x, g.y, g.personalityType, g.frame);
       });
       ctx.restore();
 
@@ -689,8 +727,7 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
         if (matchedIdsRef.current.has(c.id)) {
           drawGlow(ctx, c.x, c.y, c.color1, f);
         }
-        const walkFrame = c.state === STATES.WALKING ? c.frame : 0;
-        drawPixelChar(ctx, c.x, c.y, c.color1, c.color2, walkFrame, 2);
+        drawSpriteChar(ctx, c.x, c.y, c.personalityType, c.frame);
         drawNameTag(ctx, c.x, c.y, c.name, c.color1);
         // Draw "me" indicator for current user
         if (currentUserRef.current && c.id === currentUserRef.current.id) {
@@ -752,7 +789,7 @@ export default function PixelRoom({ onCharacterClick, matchedUserIds, currentUse
     const sorted = [...chars].sort((a, b) => b.y - a.y);
     for (const c of sorted) {
       // Character bounding box: roughly x to x+16, y-2 to y+22 (with scale=2)
-      if (canvasX >= c.x - 4 && canvasX <= c.x + 20 && canvasY >= c.y - 4 && canvasY <= c.y + 38) {
+      if (canvasX >= c.x - 10 && canvasX <= c.x + 26 && canvasY >= c.y - 8 && canvasY <= c.y + 30) {
         return c;
       }
     }
