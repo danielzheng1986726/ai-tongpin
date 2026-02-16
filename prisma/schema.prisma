@@ -64,6 +64,7 @@ model TopicPost {
   floor           Int
   content         String
   personalityType String   @map("personality_type")
+  likes           Int      @default(0)
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@map("topic_posts")

@@ -31,6 +31,7 @@ export async function GET() {
           floor: p.floor,
           content: p.content,
           personalityType: p.personalityType,
+          likes: p.likes,
           user: userMap.get(p.userId) || { id: p.userId, name: null, avatarUrl: null },
         })),
       });

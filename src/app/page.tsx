@@ -16,7 +16,7 @@ import ChatInput from "@/components/ChatInput";
 import PersonalityReveal from "@/components/PersonalityReveal";
 import { AIConversationProvider, AIConversationContext } from "@/contexts/AIConversationContext";
 import AIHighlights from "@/components/AIHighlights";
-import DailyBest from "@/components/DailyBest";
+// import DailyBest from "@/components/DailyBest";
 import LiveAIChat from "@/components/LiveAIChat";
 
 const PixelRoom = dynamic(() => import("@/components/PixelRoom"), { ssr: false });
@@ -573,7 +573,7 @@ function DiscoverView({
       <LiveAIChat users={liveAIChatUsers} />
 
       {/* 3. 今日热梗卡片区（第三面积） */}
-      <DailyBest />
+      {/* <DailyBest /> */}
 
       {/* 话题盖楼 */}
       <TopicForum />

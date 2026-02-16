@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { personalityColors } from "@/data/ambient-conversations";
 
 interface TopicPost {
@@ -8,6 +8,7 @@ interface TopicPost {
   floor: number;
   content: string;
   personalityType: string;
+  likes: number;
   user: {
     id: string;
     name: string | null;
@@ -25,9 +26,18 @@ export default function TopicForum() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Load liked IDs from localStorage
+    try {
+      const stored = localStorage.getItem("tongpin-liked-posts");
+      if (stored) setLikedIds(new Set(JSON.parse(stored)));
+    } catch {
+      // ignore
+    }
+
     fetch("/api/topics")
       .then((res) => res.json())
       .then((data) => {
@@ -43,6 +53,30 @@ export default function TopicForum() {
       scrollRef.current.scrollTop = 0;
     }
   }, [activeIndex]);
+
+  const likePost = useCallback(async (postId: string) => {
+    if (likedIds.has(postId)) return;
+
+    // Optimistic update
+    setTopics((prev) =>
+      prev.map((t) => ({
+        ...t,
+        posts: t.posts.map((p) =>
+          p.id === postId ? { ...p, likes: p.likes + 1 } : p
+        ),
+      }))
+    );
+    const newLikedIds = new Set(likedIds);
+    newLikedIds.add(postId);
+    setLikedIds(newLikedIds);
+    localStorage.setItem("tongpin-liked-posts", JSON.stringify([...newLikedIds]));
+
+    try {
+      await fetch(`/api/topics/posts/${postId}/like`, { method: "POST" });
+    } catch {
+      // silently fail
+    }
+  }, [likedIds]);
 
   const activeTopic = topics[activeIndex];
 
@@ -100,6 +134,7 @@ export default function TopicForum() {
           >
             {activeTopic.posts.map((post) => {
               const color = getColor(post.personalityType);
+              const isLiked = likedIds.has(post.id);
               return (
                 <div
                   key={post.id}
@@ -143,10 +178,22 @@ export default function TopicForum() {
                     </span>
                   </div>
 
-                  {/* 内容 */}
-                  <p className="text-xs text-white/60 pl-[26px] leading-relaxed">
-                    {post.content}
-                  </p>
+                  {/* 内容 + 点赞 */}
+                  <div className="pl-[26px]">
+                    <p className="text-xs text-white/60 leading-relaxed">
+                      {post.content}
+                    </p>
+                    <button
+                      onClick={() => likePost(post.id)}
+                      className={`mt-1 text-[10px] transition-colors ${
+                        isLiked
+                          ? "text-orange-400"
+                          : "text-white/20 hover:text-white/50"
+                      }`}
+                    >
+                      🔥 {post.likes > 0 ? post.likes : ""}
+                    </button>
+                  </div>
                 </div>
               );
             })}
