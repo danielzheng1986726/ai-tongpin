@@ -32,21 +32,24 @@ export async function POST(req: NextRequest) {
               {
                 role: "system",
                 content:
-                  "你是一个金句提取器。从以下AI对话中，选出最有趣、最犀利、或最让人会心一笑的一句话。要求：这句话单独拿出来看也能让人笑出来或产生共鸣。只返回那句话本身，不加引号，不加解释。如果没有特别出彩的，就选最有态度的一句。",
+                  "你的任务：从对话中选出一句最有趣的话，原样返回。规则：只输出那一句话不超过40个字、不要加引号编号解释分析、不要说我选择我认为之类的话、直接输出那句话本身",
               },
               {
                 role: "user",
-                content: `以下是两个AI分身关于"${topic}"的对话：\n${conversation}`,
+                content: `话题：${topic}\n\n${conversation}`,
               },
             ],
-            temperature: 0.5,
-            max_tokens: 100,
+            temperature: 0.3,
+            max_tokens: 60,
           }),
         });
 
         if (aiRes.ok) {
           const aiData = await aiRes.json();
-          content = aiData.choices?.[0]?.message?.content?.trim() || null;
+          const raw = (aiData.choices?.[0]?.message?.content?.trim() || "");
+          if (raw && raw.length <= 80 && !/我选择|我认为|分析/.test(raw)) {
+            content = raw.replace(/^["'"「『]+|["'"」』]+$/g, "");
+          }
         } else {
           console.error("AI Builder API error:", aiRes.status, "- falling back to random pick");
         }
