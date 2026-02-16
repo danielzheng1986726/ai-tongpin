@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useContext } from "react";
-import { AIConversationContext } from "@/contexts/AIConversationContext";
+import { useState, useEffect } from "react";
 
 interface Highlight {
   id: string;
@@ -15,64 +14,10 @@ export default function AIHighlights() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visible, setVisible] = useState(false);
-  const lastExtractTime = useRef<number>(0);
-  const { topic, speakerA, speakerB, recentMessages } = useContext(AIConversationContext);
-  const prevTopicRef = useRef<string | null>(null);
 
-  // Extract highlight when topic changes (meaning previous conversation ended)
+  // Load highlights from DB on mount and refresh periodically
   useEffect(() => {
-    if (!topic || !speakerA || !speakerB) return;
-
-    // Topic changed — extract highlight from previous conversation
-    if (prevTopicRef.current && prevTopicRef.current !== topic && recentMessages.length === 0) {
-      // Previous conversation just ended, but messages are cleared. Skip.
-    }
-    prevTopicRef.current = topic;
-  }, [topic, speakerA, speakerB, recentMessages]);
-
-  // Periodically extract highlights (every 60s if there are enough messages)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const now = Date.now();
-      if (now - lastExtractTime.current < 60000) return;
-      if (recentMessages.length < 3) return;
-      if (!topic || !speakerA || !speakerB) return;
-
-      lastExtractTime.current = now;
-
-      const conversationText = recentMessages
-        .map((m) => `${m.speaker}: ${m.text}`)
-        .join("\n");
-
-      try {
-        const res = await fetch("/api/highlights/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic,
-            conversation: conversationText,
-            speakerA,
-            speakerB,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.highlight) {
-            setHighlights((prev) => [...prev.slice(-9), data.highlight]);
-          }
-        }
-      } catch {
-        // silently fail
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [topic, speakerA, speakerB, recentMessages]);
-
-  // Also load recent highlights from DB on mount
-  useEffect(() => {
-    (async () => {
+    const fetchHighlights = async () => {
       try {
         const res = await fetch("/api/highlights?limit=10");
         if (res.ok) {
@@ -84,7 +29,13 @@ export default function AIHighlights() {
       } catch {
         // silently fail
       }
-    })();
+    };
+
+    fetchHighlights();
+
+    // Refresh from DB every 30 seconds to pick up new extractions
+    const refreshInterval = setInterval(fetchHighlights, 30000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Cycle through highlights every 15 seconds

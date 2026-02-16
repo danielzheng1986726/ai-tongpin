@@ -28,6 +28,7 @@ export default function LiveAIChat({ users }: LiveAIChatProps) {
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastExtractTimeRef = useRef<number>(0);
   const aiConversation = useContext(AIConversationContext);
 
   const usersWithPersonality = useMemo(
@@ -115,6 +116,32 @@ export default function LiveAIChat({ users }: LiveAIChatProps) {
 
       if (i < conv.messages.length - 1) {
         await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
+      }
+    }
+
+    // Extract highlight from this conversation (throttled to once per 60s)
+    const now = Date.now();
+    if (now - lastExtractTimeRef.current >= 60000) {
+      lastExtractTimeRef.current = now;
+      const conversationText = conv.messages
+        .map((m) => {
+          const user = assignedUsers[m.personality];
+          return `${user.username}: ${m.text}`;
+        })
+        .join("\n");
+      try {
+        await fetch("/api/highlights/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: conv.topic,
+            conversation: conversationText,
+            speakerA: allUsers[0]?.username || "",
+            speakerB: allUsers[1]?.username || "",
+          }),
+        });
+      } catch {
+        // silently fail - don't block the conversation loop
       }
     }
 
