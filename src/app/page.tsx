@@ -18,6 +18,7 @@ import { AIConversationProvider, AIConversationContext } from "@/contexts/AIConv
 import AIHighlights from "@/components/AIHighlights";
 // import DailyBest from "@/components/DailyBest";
 import LiveAIChat from "@/components/LiveAIChat";
+import PersonalityQuiz from "@/components/PersonalityQuiz";
 
 const PixelRoom = dynamic(() => import("@/components/PixelRoom"), { ssr: false });
 
@@ -53,6 +54,7 @@ export default function Home() {
   const [me, setMe] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [showReveal, setShowReveal] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -89,17 +91,28 @@ export default function Home() {
     );
   }
 
+  const handleJoin = () => setShowQuiz(true);
+
   return (
     <AIConversationProvider>
       <div className="min-h-screen bg-gradient-to-b from-[#0F0B1F] to-[#1A1230]">
-        <Header user={me} />
-        <DiscoverView currentUser={me} setMe={setMe} />
+        <Header user={me} onJoin={handleJoin} />
+        <DiscoverView currentUser={me} setMe={setMe} onJoin={handleJoin} />
       </div>
+      {showQuiz && (
+        <PersonalityQuiz
+          onComplete={(user) => {
+            setMe(user);
+            setShowQuiz(false);
+          }}
+          onClose={() => setShowQuiz(false)}
+        />
+      )}
     </AIConversationProvider>
   );
 }
 
-function Header({ user }: { user: UserInfo | null }) {
+function Header({ user, onJoin }: { user: UserInfo | null; onJoin?: () => void }) {
   return (
     <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
       <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
@@ -115,9 +128,9 @@ function Header({ user }: { user: UserInfo | null }) {
             </a>
           </div>
         ) : (
-          <a href="/api/auth/login" className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
-            登录
-          </a>
+          <button onClick={onJoin} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+            加入同频
+          </button>
         )}
       </div>
     </header>
@@ -378,9 +391,11 @@ function PersonalityCard({
 function DiscoverView({
   currentUser,
   setMe,
+  onJoin,
 }: {
   currentUser: UserInfo | null;
   setMe: (u: UserInfo) => void;
+  onJoin?: () => void;
 }) {
   const router = useRouter();
   const [users, setUsers] = useState<OtherUser[]>([]);
@@ -563,6 +578,7 @@ function DiscoverView({
           onMatch={handlePopupMatch}
           onViewReport={handlePopupViewReport}
           onClose={() => setSelectedChar(null)}
+          onJoin={onJoin}
         />
       )}
 
@@ -570,10 +586,10 @@ function DiscoverView({
       {/* 弹幕输入框 + emoji 快捷按钮 */}
       <div className="w-full max-w-lg mx-auto">
         <ChatInput
-          onSend={handleSendDanmaku}
+          onSend={currentUser ? handleSendDanmaku : () => onJoin?.()}
           disabled={!currentUser}
           username={currentUser?.name || undefined}
-          placeholder={currentUser ? undefined : "登录后可以发弹幕"}
+          placeholder={currentUser ? undefined : "加入同频后可以发弹幕"}
         />
       </div>
 
@@ -606,10 +622,10 @@ function DiscoverView({
         )}
         {showFullCard && !currentUser && (
           <div className="mt-2 text-center py-4">
-            <p className="text-sm text-white/50 mb-2">登录后即可生成你的职场人格画像</p>
-            <a href="/api/auth/login" className="text-xs text-purple-400 hover:text-purple-300">
-              使用 SecondMe 登录 →
-            </a>
+            <p className="text-sm text-white/50 mb-2">做一个 8 题小测试，生成你的职场人格画像</p>
+            <button onClick={onJoin} className="text-xs text-purple-400 hover:text-purple-300">
+              加入同频 →
+            </button>
           </div>
         )}
       </div>
@@ -690,6 +706,7 @@ function CharacterPopup({
   onMatch,
   onViewReport,
   onClose,
+  onJoin,
 }: {
   char: SelectedChar;
   users: OtherUser[];
@@ -698,6 +715,7 @@ function CharacterPopup({
   onMatch: (targetId: string) => void;
   onViewReport: (matchId: string) => void;
   onClose: () => void;
+  onJoin?: () => void;
 }) {
   const isMe = currentUser ? char.id === currentUser.id : false;
   const userInfo = users.find(u => u.id === char.id);
@@ -784,12 +802,12 @@ function CharacterPopup({
 
           {/* Action buttons */}
           {!currentUser ? (
-            <a
-              href="/api/auth/login"
-              className="w-full text-sm font-medium py-2.5 rounded-xl text-white text-center transition-opacity hover:opacity-90 bg-gradient-to-r from-purple-600 to-teal-500 block"
+            <button
+              onClick={() => { onClose(); onJoin?.(); }}
+              className="w-full text-sm font-medium py-2.5 rounded-xl text-white text-center transition-opacity hover:opacity-90 bg-gradient-to-r from-purple-600 to-teal-500"
             >
-              登录后可发起 AI 同频
-            </a>
+              加入同频后可发起 AI 匹配
+            </button>
           ) : isMe ? (
             <p className="text-xs text-white/30">这是你自己的 AI 分身</p>
           ) : userInfo?.matchScore != null && userInfo?.matchId ? (
