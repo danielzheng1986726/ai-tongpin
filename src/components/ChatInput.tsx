@@ -7,12 +7,14 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
   username?: string;
+  placeholder?: string;
 }
 
 export default function ChatInput({
   onSend,
   disabled,
   username,
+  placeholder,
 }: ChatInputProps) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +44,7 @@ export default function ChatInput({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="发一条弹幕到同频小屋..."
+            placeholder={placeholder || "发一条弹幕到同频小屋..."}
             disabled={disabled}
             maxLength={50}
             className="w-full bg-white/10 border border-white/15 rounded-full px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 transition-colors"

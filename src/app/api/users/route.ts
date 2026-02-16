@@ -4,8 +4,22 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const me = await getCurrentUser();
+
+  // Guest mode: return all users without match scores
   if (!me) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        shadesJson: true,
+        personalityType: true,
+      },
+    });
+    return NextResponse.json({
+      users: users.map(u => ({ ...u, matchScore: null, matchId: null })),
+    });
   }
 
   const [users, matches] = await Promise.all([

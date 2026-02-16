@@ -93,7 +93,7 @@ export default function Home() {
     <AIConversationProvider>
       <div className="min-h-screen bg-gradient-to-b from-[#0F0B1F] to-[#1A1230]">
         <Header user={me} />
-        {me ? <DiscoverView currentUser={me} setMe={setMe} /> : <LoginView />}
+        <DiscoverView currentUser={me} setMe={setMe} />
       </div>
     </AIConversationProvider>
   );
@@ -104,7 +104,7 @@ function Header({ user }: { user: UserInfo | null }) {
     <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
       <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
         <h1 className="text-base font-semibold text-white/90">同频</h1>
-        {user && (
+        {user ? (
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/50">{user.name || "用户"}</span>
             <a
@@ -114,6 +114,10 @@ function Header({ user }: { user: UserInfo | null }) {
               退出
             </a>
           </div>
+        ) : (
+          <a href="/api/auth/login" className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+            登录
+          </a>
         )}
       </div>
     </header>
@@ -375,7 +379,7 @@ function DiscoverView({
   currentUser,
   setMe,
 }: {
-  currentUser: UserInfo;
+  currentUser: UserInfo | null;
   setMe: (u: UserInfo) => void;
 }) {
   const router = useRouter();
@@ -458,6 +462,7 @@ function DiscoverView({
 
   // 发送弹幕
   const handleSendDanmaku = async (message: string) => {
+    if (!currentUser) return;
     const pType = currentUser.personalityType as string | undefined;
     const color = pType && personalityColors[pType]
       ? personalityColors[pType].to
@@ -485,6 +490,7 @@ function DiscoverView({
 
   const startMatch = useCallback(
     async (targetId: string) => {
+      if (!currentUser) return;
       setMatchingId(targetId);
       try {
         const res = await fetch("/api/match/start", {
@@ -500,11 +506,11 @@ function DiscoverView({
         setMatchingId(null);
       }
     },
-    [router]
+    [router, currentUser]
   );
 
   // 人格信息
-  const pKey = currentUser.personalityType as PersonalityKey | null;
+  const pKey = currentUser?.personalityType as PersonalityKey | null;
   const personality = pKey ? PERSONALITIES[pKey] : null;
 
   const matchedUserIds = users.filter(u => u.matchScore != null).map(u => u.id);
@@ -528,7 +534,7 @@ function DiscoverView({
 
   // Build user list for LiveAIChat (needs username field)
   const liveAIChatUsers = [
-    { id: currentUser.id, username: currentUser.name || "用户", personalityType: currentUser.personalityType },
+    ...(currentUser ? [{ id: currentUser.id, username: currentUser.name || "用户", personalityType: currentUser.personalityType }] : []),
     ...users.map(u => ({ id: u.id, username: u.name || "???", personalityType: u.personalityType })),
   ];
 
@@ -540,7 +546,7 @@ function DiscoverView({
         <PixelRoom
           onCharacterClick={handleCharClick}
           matchedUserIds={matchedUserIds}
-          currentUser={{ id: currentUser.id, name: currentUser.name || "用户", personalityType: currentUser.personalityType }}
+          currentUser={currentUser ? { id: currentUser.id, name: currentUser.name || "用户", personalityType: currentUser.personalityType } : undefined}
           aiSpeaker={currentSpeaker}
           aiMessage={currentMessage}
         />
@@ -560,12 +566,14 @@ function DiscoverView({
         />
       )}
 
+
       {/* 弹幕输入框 + emoji 快捷按钮 */}
       <div className="w-full max-w-lg mx-auto">
         <ChatInput
           onSend={handleSendDanmaku}
           disabled={!currentUser}
-          username={currentUser.name || undefined}
+          username={currentUser?.name || undefined}
+          placeholder={currentUser ? undefined : "登录后可以发弹幕"}
         />
       </div>
 
@@ -591,9 +599,17 @@ function DiscoverView({
             {showFullCard ? "▲ 收起" : "▼ 展开"}
           </span>
         </button>
-        {showFullCard && (
+        {showFullCard && currentUser && (
           <div className="mt-2">
             <PersonalitySection user={currentUser} onUpdate={setMe} />
+          </div>
+        )}
+        {showFullCard && !currentUser && (
+          <div className="mt-2 text-center py-4">
+            <p className="text-sm text-white/50 mb-2">登录后即可生成你的职场人格画像</p>
+            <a href="/api/auth/login" className="text-xs text-purple-400 hover:text-purple-300">
+              使用 SecondMe 登录 →
+            </a>
           </div>
         )}
       </div>
@@ -633,7 +649,7 @@ function DiscoverView({
                     user={user}
                     isMatching={matchingId === user.id}
                     onMatch={() => startMatch(user.id)}
-                    currentUserPersonalityType={currentUser.personalityType}
+                    currentUserPersonalityType={currentUser?.personalityType ?? null}
                   />
                 ))}
               </div>
@@ -677,19 +693,19 @@ function CharacterPopup({
 }: {
   char: SelectedChar;
   users: OtherUser[];
-  currentUser: UserInfo;
+  currentUser: UserInfo | null;
   matchingId: string | null;
   onMatch: (targetId: string) => void;
   onViewReport: (matchId: string) => void;
   onClose: () => void;
 }) {
-  const isMe = char.id === currentUser.id;
+  const isMe = currentUser ? char.id === currentUser.id : false;
   const userInfo = users.find(u => u.id === char.id);
   const personality = char.personalityType && PERSONALITIES[char.personalityType as PersonalityKey]
     ? PERSONALITIES[char.personalityType as PersonalityKey]
     : null;
 
-  const myColor = currentUser.personalityType
+  const myColor = currentUser?.personalityType
     ? personalityColors[currentUser.personalityType]
     : null;
   const theirColor = char.personalityType
@@ -767,7 +783,14 @@ function CharacterPopup({
           )}
 
           {/* Action buttons */}
-          {isMe ? (
+          {!currentUser ? (
+            <a
+              href="/api/auth/login"
+              className="w-full text-sm font-medium py-2.5 rounded-xl text-white text-center transition-opacity hover:opacity-90 bg-gradient-to-r from-purple-600 to-teal-500 block"
+            >
+              登录后可发起 AI 同频
+            </a>
+          ) : isMe ? (
             <p className="text-xs text-white/30">这是你自己的 AI 分身</p>
           ) : userInfo?.matchScore != null && userInfo?.matchId ? (
             <div className="flex gap-3 w-full">
