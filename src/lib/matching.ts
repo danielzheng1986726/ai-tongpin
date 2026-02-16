@@ -107,97 +107,86 @@ async function callAIBuilder(systemPrompt: string, userMessage: string, options?
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
-async function simulateChat(user: { name: string | null; personalityType: string | null; personalityScores: string | null }): Promise<ChatRound[]> {
-  const pKey = user.personalityType as PersonalityKey | null;
-  const personality = pKey ? PERSONALITIES[pKey] : null;
-
-  const personaDesc = personality
-    ? `你的职场人格是"${personality.name}"（${personality.nameEn}）。性格特点：${personality.traits.join("、")}。${personality.description}`
-    : "你是一个普通的职场人。";
-
-  const systemPrompt = `你在扮演一个叫"${user.name || "某人"}"的职场人。${personaDesc}
-请用这个人格的口吻和视角来回答问题。要求：
-1. 回答要符合这个人格类型的特征
-2. 每次回答控制在80字以内
-3. 语气自然真诚，像真人聊天
-4. 不要提到你是AI或你在扮演角色`;
-
-  const chatLog: ChatRound[] = [];
-
-  for (let i = 0; i < CHAT_QUESTIONS.length; i++) {
-    let prompt = CHAT_QUESTIONS[i];
-    if (i > 0) {
-      const prevAnswer = chatLog[i - 1].answer;
-      prompt = `你刚才说了："${prevAnswer}"\n\n现在对方问你：${CHAT_QUESTIONS[i]}\n\n请先用1句话接上之前的话题，再回答新问题。`;
-    }
-
-    const answer = await callAIBuilder(systemPrompt, prompt, { temperature: 0.8, max_tokens: 150 });
-    chatLog.push({ question: CHAT_QUESTIONS[i], answer });
-  }
-
-  return chatLog;
-}
-
-async function generateReportViaAIBuilder(
+async function runAIBuilderMatching(
   userA: { name: string | null; personalityType: string | null; personalityScores: string | null },
-  userB: { name: string | null; personalityType: string | null; personalityScores: string | null },
-  chatLog: ChatRound[]
-): Promise<MatchReport> {
+  userB: { name: string | null; personalityType: string | null; personalityScores: string | null }
+): Promise<{ chatLog: ChatRound[]; report: MatchReport }> {
   const pA = userA.personalityType as PersonalityKey | null;
   const pB = userB.personalityType as PersonalityKey | null;
   const personalityA = pA ? PERSONALITIES[pA] : null;
   const personalityB = pB ? PERSONALITIES[pB] : null;
 
-  const chatSummary = chatLog
-    .map((r, i) => `问题${i + 1}: ${r.question}\n回答: ${r.answer}`)
-    .join("\n\n");
+  const systemPrompt = `你是一个职场人格匹配分析系统。仅输出合法JSON，不要输出任何解释、不要用markdown代码块包裹。`;
 
-  const systemPrompt = `仅输出合法 JSON 对象，不要输出任何解释文字、不要用markdown代码块包裹。
-输出结构：
-{
-  "totalScore": number(0到100的整数),
-  "dimensions": {
-    "career": { "score": number(0-100), "label": "职业方向", "reason": "一句话原因" },
-    "industry": { "score": number(0-100), "label": "行业认知", "reason": "一句话原因" },
-    "workStyle": { "score": number(0-100), "label": "工作风格", "reason": "一句话原因" },
-    "values": { "score": number(0-100), "label": "价值观", "reason": "一句话原因" }
-  },
-  "summary": "30字以内的匹配总结",
-  "recommendation": "一句话推荐理由"
-}`;
+  const userMessage = `## 任务
+根据两位用户的职场人格，模拟一段4轮对话，并生成匹配分析报告。
 
-  const userMessage = `## 用户A的信息
-姓名: ${userA.name || "未知"}
-职场人格: ${personalityA ? `${personalityA.name}（${personalityA.traits.join("、")}）` : "未知"}
+## 用户A
+姓名: ${userA.name || "用户A"}
+职场人格: ${personalityA ? `${personalityA.name}（${personalityA.nameEn}）- ${personalityA.traits.join("、")}` : "未知"}
+${personalityA ? `特征: ${personalityA.description}` : ""}
 ${userA.personalityScores ? `四维分数: ${userA.personalityScores}` : ""}
 
-## 用户B的信息
-姓名: ${userB.name || "未知"}
-职场人格: ${personalityB ? `${personalityB.name}（${personalityB.traits.join("、")}）` : "未知"}
+## 用户B
+姓名: ${userB.name || "用户B"}
+职场人格: ${personalityB ? `${personalityB.name}（${personalityB.nameEn}）- ${personalityB.traits.join("、")}` : "未知"}
+${personalityB ? `特征: ${personalityB.description}` : ""}
 ${userB.personalityScores ? `四维分数: ${userB.personalityScores}` : ""}
 
-## 用户B的对话记录
-${chatSummary}
+## 对话问题（用这4个问题依次提问用户B，用户B用自己的人格风格回答）
+1. ${CHAT_QUESTIONS[0]}
+2. ${CHAT_QUESTIONS[1]}
+3. ${CHAT_QUESTIONS[2]}
+4. ${CHAT_QUESTIONS[3]}
 
-请根据以上信息评估用户A和用户B的职场匹配程度。totalScore是四个维度的综合评分。`;
+## 输出格式（严格JSON）
+{
+  "chatLog": [
+    {"question": "问题1原文", "answer": "用户B的回答（80字以内，符合其人格特征）"},
+    {"question": "问题2原文", "answer": "用户B的回答"},
+    {"question": "问题3原文", "answer": "用户B的回答"},
+    {"question": "问题4原文", "answer": "用户B的回答"}
+  ],
+  "report": {
+    "totalScore": 0到100的整数,
+    "dimensions": {
+      "career": {"score": 0-100, "label": "职业方向", "reason": "一句话原因"},
+      "industry": {"score": 0-100, "label": "行业认知", "reason": "一句话原因"},
+      "workStyle": {"score": 0-100, "label": "工作风格", "reason": "一句话原因"},
+      "values": {"score": 0-100, "label": "价值观", "reason": "一句话原因"}
+    },
+    "summary": "30字以内的匹配总结",
+    "recommendation": "一句话推荐理由"
+  }
+}`;
 
-  const result = await callAIBuilder(systemPrompt, userMessage, { temperature: 0.3, max_tokens: 500 });
+  const result = await callAIBuilder(systemPrompt, userMessage, { temperature: 0.5, max_tokens: 1000 });
 
   try {
     const cleaned = result.replace(/```json\s*|```\s*/g, "").trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+
+    // 校验必要字段存在
+    if (parsed.chatLog && Array.isArray(parsed.chatLog) && parsed.report && parsed.report.totalScore !== undefined) {
+      return { chatLog: parsed.chatLog, report: parsed.report };
+    }
+    throw new Error("Missing required fields");
   } catch {
+    // 解析失败，返回默认值
     return {
-      totalScore: 70,
-      dimensions: {
-        career: { score: 70, label: "职业方向", reason: "初步评估，建议进一步沟通" },
-        industry: { score: 70, label: "行业认知", reason: "初步评估，建议进一步沟通" },
-        workStyle: { score: 70, label: "工作风格", reason: "初步评估，建议进一步沟通" },
-        values: { score: 70, label: "价值观", reason: "初步评估，建议进一步沟通" },
+      chatLog: CHAT_QUESTIONS.map(q => ({ question: q, answer: "（AI 生成中遇到问题，请重试）" })),
+      report: {
+        totalScore: 70,
+        dimensions: {
+          career: { score: 70, label: "职业方向", reason: "初步评估，建议进一步沟通" },
+          industry: { score: 70, label: "行业认知", reason: "初步评估，建议进一步沟通" },
+          workStyle: { score: 70, label: "工作风格", reason: "初步评估，建议进一步沟通" },
+          values: { score: 70, label: "价值观", reason: "初步评估，建议进一步沟通" },
+        },
+        summary: "初步匹配完成，建议进一步沟通了解",
+        recommendation: "两位用户有一定的共同特质，值得进一步交流",
       },
-      summary: "初步匹配完成，建议进一步沟通了解",
-      recommendation: "两位用户有一定的共同特质，值得进一步交流",
     };
   }
 }
@@ -226,9 +215,10 @@ export async function runMatching(
     let report: MatchReport;
 
     if (useAIBuilder) {
-      // === AI Builder path (guest users) ===
-      chatLog = await simulateChat(userB);
-      report = await generateReportViaAIBuilder(userA, userB, chatLog);
+      // === AI Builder path (guest users) — 单次调用 ===
+      const result = await runAIBuilderMatching(userA, userB);
+      chatLog = result.chatLog;
+      report = result.report;
     } else {
       // === SecondMe path (OAuth users) ===
 
