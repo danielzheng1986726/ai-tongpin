@@ -48,3 +48,11 @@ next-env.d.ts
 
 # claude code (contains secrets)
 CLAUDE.md
+
+# additional common ignores
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.log
+dist/
